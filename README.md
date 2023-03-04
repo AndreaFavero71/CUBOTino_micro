@@ -1,7 +1,7 @@
 # CUBOTino micro
 
 STILL WORK IN PROGRESS
-This repo contains the relevant files to make CUBOTino micro: World's smallest Rubik's cube solver robot
+This repo contains the relevant files to make CUBOTino micro: World's smallest Rubik's cube solver robot. <br />
 ![title image](/images/title.jpg)
 
 More info will be made available at: https://www.instructables.com/member/AndreaFavero/
