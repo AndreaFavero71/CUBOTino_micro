@@ -3,11 +3,11 @@
 
 """
 #############################################################################################################
-# Andrea Favero 30 Dec 2022
+# Andrea Favero 01 March 2023
 # 
 # From Kociemba solver to robot moves
-# This applies to "CUBOTino" autonomous, a simpler Rubik's cube solver robot than my first one:
-# (https://www.youtube.com/watch?v=oYRXe4NyJqs)
+# This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
+# CUBOTino micro is the smallest version of the CUBOTino versions
 #
 # The Kociemba cube solver returns a solution that has to be translated into robot movements
 # Notations for faces are as per URF notations: U=Up, R=Right, F=Front, D=Down, L=Left, B=Back
