@@ -1,19 +1,17 @@
 # CUBOTino micro
 
+STILL WORK IN PROGRESS
 This repo contains the relevant files to make CUBOTino micro: World's smallest Rubik's cube solver robot
 ![title image](/images/title.jpg)
 
-Further robot info at: https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/
+More info will be made available at: https://www.instructables.com/CUBOTino-Autonomous-Small-3D-Printed-Rubiks-Cube-R/
 
 An impression of the robot: https://youtu.be/EbOHhvg2tJE
 
 
-This git repo simplifies the download of the individual files and automates as much a possible the deployment to the Raspberry Pi
-
-This installation has proved to work on different Raspberry Pi models; Please report in case you experience issues.
 
 # How to use it:
-1. Flash your SD card according to the procedure in the [document here](doc/How_to_make_CUBOTino_autonomous_robot_20230120.pdf) , Chapter 7, Step1 to Step3
+1. Flash your SD card according to the Cubotino Autonomous procedure.
 2. Put the sd card in the pi and power it. You can monitor the boot process if you connect an hdmi monitor to it but it is not essential. 
 3. Try to connect to the Raspberry Pi via SSH. On Windows you can use Putty. On linux and mac you can type directly:
 ```
