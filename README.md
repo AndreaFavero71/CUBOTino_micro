@@ -1,6 +1,6 @@
 # CUBOTino micro
 
-STILL WORK IN PROGRESS
+STILL WORK IN PROGRESS <br />
 This repo contains the relevant files to make CUBOTino micro: World's smallest Rubik's cube solver robot. <br />
 ![title image](/images/title.jpg)
 
@@ -11,7 +11,7 @@ An impression of the robot: https://youtu.be/EbOHhvg2tJE
 
 
 # How to use it:
-1. Flash your SD card according to the Cubotino Autonomous procedure.
+1. Flash your SD card according to the Cubotino Autonomous procedure (UNTIL UPDATED INFO WILL BE PUBLISHED).
 2. Put the sd card in the pi and power it. You can monitor the boot process if you connect an hdmi monitor to it but it is not essential. 
 3. Try to connect to the Raspberry Pi via SSH. On Windows you can use Putty. On linux and mac you can type directly:
 ```
@@ -28,7 +28,7 @@ sudo ./install/setup.sh
 7. If there is any error during the script execution try to fix it and rerun the script again
 
 
-# Tuning the servos position via GUI (connect via VNC):
+# Tuning the servos position via GUI (via VNC):
 ```
 cd ~/cubotino_micro/src
 source .virtualenvs/bin/activate
@@ -65,7 +65,7 @@ Check out the "How_to_make ...  .pdf" document (at /doc folder) for further info
 
 
 # Please leave a feedback if you build it
-I hope many of you will decide to build your own CUBOTino, and that you'll enjoy it as much much as I did. <br />
+I hope many of you will decide to build your own CUBOTino micro, and that you'll enjoy it as much much as I did. <br />
 I hope you will also post an "I Made it", on the Instructables site of this project (link above); <br />
 I can ensure you, seeing a new born CUBOTino makes me feel very well 🙂
 
