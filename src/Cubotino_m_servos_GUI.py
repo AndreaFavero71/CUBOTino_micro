@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 04 March 2023
+# Andrea Favero 07 March 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -33,7 +33,7 @@ from Cubotino_m_display import display as disp   # custom library controlling Cu
 
 
 
-# #################### functions to manage the GUI clkosing ##########################################################
+# #################### functions to manage the GUI closing ###########################################################
 def on_closing():
     disp.show_cubotino()
     root.destroy()
@@ -311,38 +311,43 @@ def servo_close(val):
     servo.servo_to_pos('top', t_servo_rel)    # top servo is positioned to the slider value
     time.sleep(t_rel_time)
     disp.show_on_display('t_srv CLOSE', f'{t_servo_close} ({t_servo_rel})', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    t_servo_pos = 'close'                        # string variable to track the last top_cover position
+    t_servo_pos = 'close'                     # string variable to track the last top_cover position
+    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
 
 
 def servo_release(val):
     global t_servo_rel_delta, t_servo_pos
     t_servo_rel_delta = round(float(s_top_srv_rel_delta.get()),3)  # top servo release position after closing toward the cube
     disp.show_on_display('t_srv RELEASE', f'({t_servo_rel_delta})', fs1=25, y2=75, fs2=30)  # feedback is printed to the display
-    t_servo_pos = 'close'                        # string variable to track the last top_cover position
+    t_servo_pos = 'close'                     # string variable to track the last top_cover position
+    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
 
 
 def servo_open(val):
     global t_servo_open, t_servo_pos
     t_servo_open = round(float(s_top_srv_open.get()),3)  # top servo pos to free up the top cover from the cube
     disp.show_on_display('t_srv OPEN', str(t_servo_open), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_open)      # top servo is positioned to the slider value
-    t_servo_pos = 'open'                       # string variable to track the last top_cover position
+    servo.servo_to_pos('top', t_servo_open)   # top servo is positioned to the slider value
+    t_servo_pos = 'open'                      # string variable to track the last top_cover position
+    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
     
 
 def servo_read(val):
     global t_servo_read, t_servo_pos
     t_servo_read = round(float(s_top_srv_read.get()),3)  # top servo pos for camera reading
     disp.show_on_display('t_srv READ', str(t_servo_read), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_read)      # top servo is positioned to the slider value
-    t_servo_pos = 'read'                       # string variable to track the last top_cover position                    
+    servo.servo_to_pos('top', t_servo_read)   # top servo is positioned to the slider value
+    t_servo_pos = 'read'                      # string variable to track the last top_cover position
+    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
 
 
 def servo_flip(val):
     global t_servo_flip, t_servo_pos
     t_servo_flip = round(float(s_top_srv_flip.get()),3)  # top servo pos to flip the cube on one of its horizontal axis
     disp.show_on_display('t_srv FLIP', str(t_servo_flip), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_flip)              # top servo is positioned to the slider value
-    t_servo_pos = 'flip'                       # string variable to track the last top_cover position
+    servo.servo_to_pos('top', t_servo_flip)   # top servo is positioned to the slider value
+    t_servo_pos = 'flip'                      # string variable to track the last top_cover position
+    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
     
     
 def flip_to_close_time(val):
@@ -912,20 +917,9 @@ cw_btn.grid(row=1, column=2, sticky="n", padx=20, pady=10)
 
 
 
-#### Large test ####
-large_test_label = tk.LabelFrame(root, text="Full test", labelanchor="nw", font=("Arial", "14"))
-large_test_label.grid(row=2, column=1, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
-
-test_btn = tk.Button(large_test_label, text="LONG TEST\n(on saved settings)", height=4, width=22, state="normal", command= test)
-test_btn.configure(font=("Arial", "12"))
-test_btn.grid(row=0, column=0, sticky="w", padx=20, pady=10)
-
-
-
-
 #### saving settings ####
 files_label = tk.LabelFrame(root, text="Settings files", labelanchor="nw", font=("Arial", "14"))
-files_label.grid(row=2, column=2, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
+files_label.grid(row=2, column=1, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
 
 
 reset_btn = tk.Button(files_label, text="LOAD PREVIOUS SETTING", height=1, width=30, state="normal", command= load_previous_settings)
@@ -940,8 +934,22 @@ save_btn.grid(row=1, column=0, sticky="n", padx=20, pady=10)
 
 
 
+#### Large test ####
+large_test_label = tk.LabelFrame(root, text="Full test", labelanchor="nw", font=("Arial", "14"))
+large_test_label.grid(row=2, column=2, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
 
-############################################ main part
+test_btn = tk.Button(large_test_label, text="LONG TEST\n(on saved settings)", height=4, width=22, state="normal", command= test)
+test_btn.configure(font=("Arial", "12"))
+test_btn.grid(row=0, column=0, sticky="w", padx=20, pady=10)
+
+
+
+
+
+# ####################################################################################################################
+# ###############################     main part   ####################################################################
+# ####################################################################################################################
+
 btm_srv_widgets_status()
 root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()   # tkinter main loop
