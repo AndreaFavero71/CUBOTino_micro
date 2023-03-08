@@ -3,7 +3,7 @@
 
 """ 
 #############################################################################################################
-#  Andrea Favero, 04 March 2023
+#  Andrea Favero, 08 March 2023
 #
 #
 #  This code relates to CUBOTino autonomous, a very small and simple Rubik's cube solver robot 3D printed.
@@ -100,7 +100,7 @@ def import_parameters():
     """ Function to import parameters from a json file, to make easier to list/document/change the variables
         that are expected to vary on each robot."""
        
-    global frameless_cube, camera_width_res, camera_hight_res, s_mode
+    global frameless_cube, camera_width_res, camera_height_res, s_mode
     global kl, x_l, x_r, y_u, y_b, warp_fraction, warp_slicing, square_ratio, rhombus_ratio
     global delta_area_limit, sv_max_moves, sv_max_time, collage_w, marg_coef, cam_led_bright, cam_led_auto
     global detect_timeout, show_time, warn_time, quit_time, cover_self_close, vnc_delay
@@ -155,7 +155,7 @@ def import_parameters():
                 frameless_cube = 'auto'                                # cube with/without black frame around the facelets
             
             camera_width_res = int(settings['camera_width_res'])      # Picamera resolution on width 
-            camera_hight_res = int(settings['camera_hight_res'])      # Picamera resolution on heigh
+            camera_height_res = int(settings['camera_height_res'])      # Picamera resolution on heigh
             s_mode = int(settings['s_mode'])                          # camera setting mode (pixels binning)
             kl = float(settings['kl'])                                # coff. for PiCamera stabili acceptance
             x_l = int(settings['x_l'])                                # image crop on left (before warping)
@@ -335,10 +335,10 @@ def webcam():
     
     rawCapture = PiRGBArray(camera)        # returns (uncoded) RGB array from the camera
     # camera_width_res = 640   #(AF 640)   # PiCamera width resolution setting (other possible values: 800 or 1088)
-    # camera_hight_res = 480   #(AF 480)   # PiCamera height resolution setting (other possible values: 544 or 720)
+    # camera_height_res = 480   #(AF 480)  # PiCamera height resolution setting (other possible values: 544 or 720)
     
     width = camera_width_res               # image width
-    height = camera_hight_res              # image height
+    height = camera_height_res             # image height
     camera.resolution = (width, height)    # camera's resolution is set
     time.sleep(0.15)                       # little delay to let the camera setting
     
@@ -2034,7 +2034,10 @@ def cube_solution(cube_string, scrambling=False):
         disp.show_on_display('SOLUTION', 'SEARCH', fs1=34, fs2=44)
 #     sv_max_moves = 20     #(AF 20)  # solver parameter: max 20 moves or best at timeout
 #     sv_max_time = 2       #(AF 2)   # solver parameter: timeout of 2 seconds, if not solution within max moves
+   
+
     s = sv.solve(cube_string, sv_max_moves, sv_max_time)  # solver is called
+
     
 #################  solveto function to reach a wanted cube target from a known starting cube status   ######
 #     cube_sts = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB'

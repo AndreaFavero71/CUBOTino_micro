@@ -18,8 +18,8 @@
 "b_home": 0.0,
 "b_rel_CCW": 0.08,
 "b_rel_CW": 0.08,
-"b_extra_home_CW": 0.06,
 "b_extra_home_CCW": 0.08,
+"b_extra_home_CW": 0.06,
 "b_spin_time": 0.16,
 "b_rotate_time": 0.26,
 "b_rel_time": 0.0

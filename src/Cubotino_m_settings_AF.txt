@@ -5,7 +5,8 @@
 "disp_offsetL": "40",
 "disp_offsetT": "53",
 "camera_width_res": "640",
-"camera_hight_res": "480",
+"camera_height_res": "480",
+"s_mode": "7",
 "kl": "0.95",
 "x_l": "70",
 "x_r": "60",
@@ -26,6 +27,5 @@
 "warn_time": "1.5",
 "quit_time": "4.5",
 "cover_self_close": "true",
-"s_mode": "7",
 "vnc_delay": "0.5"
 }

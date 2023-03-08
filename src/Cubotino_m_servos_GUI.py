@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 07 March 2023
+# Andrea Favero 08 March 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -489,8 +489,8 @@ def servo_init():
     global t_servo_pos, b_servo_pos
     
     servo_init=servo.servo_tune_via_gui(debug=False, start_pos = 'open')  # servos are initialized, and set to their starting positions
-    if servo_init:                           # case the servo init has successed
-        t_servo_pos = 'open'               # string variable to track the last top_cover position
+    if servo_init:                         # case the servo init has successed
+        t_servo_pos = 'start'              # string variable to track the last top_cover position
         b_servo_pos = 'home'               # string variable to track the last holder position
 #         btm_srv_widgets_status()
 
