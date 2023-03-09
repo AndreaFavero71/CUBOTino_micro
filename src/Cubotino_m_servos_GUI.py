@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 08 March 2023
+# Andrea Favero 09 March 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -447,19 +447,21 @@ def servo_rel_CW(val):
     disp.show_on_display('b_rel_CW', str(b_rel_CW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
 
 
-def servo_extra_home_CW(val):
-    global b_extra_home_CW, b_servo_pos
-    b_extra_home_CW = round(float(s_extra_home_CW.get()),3)    # bottom servo position extra rotation at home, to release tension
-    disp.show_on_display('b_extra CW', str(b_extra_home_CW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('bottom', b_extra_home_CW)              # bottom servo is positioned to the slider value
-    b_servo_pos = 'CW'                                         # string variable to track the last holder position
-
-
 def servo_extra_home_CCW(val):
     global b_extra_home_CCW, b_servo_pos
     b_extra_home_CCW = round(float(s_extra_home_CCW.get()),3)  # bottom servo position extra rotation at home, to release tension
     disp.show_on_display('b_extra CCW', str(b_extra_home_CCW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('bottom', b_extra_home_CCW)             # bottom servo is positioned to the slider value
+    target = round(b_home + b_extra_home_CCW,3)                # target position is defined by the b_home AND b_extra_home_ccw
+    servo.servo_to_pos('bottom', target)                       # bottom servo is positioned to the slider value
+    b_servo_pos = 'CW'                                         # string variable to track the last holder position
+
+
+def servo_extra_home_CW(val):
+    global b_extra_home_CW, b_servo_pos
+    b_extra_home_CW = round(float(s_extra_home_CW.get()),3)    # bottom servo position extra rotation at home, to release tension
+    disp.show_on_display('b_extra CW', str(b_extra_home_CW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
+    target = round(b_home - b_extra_home_CW,3)                 # target position is defined by the b_home AND b_extra_home_cw
+    servo.servo_to_pos('bottom', target)                       # bottom servo is positioned to the slider value
     b_servo_pos = 'CW'                                         # string variable to track the last holder position
 
 
