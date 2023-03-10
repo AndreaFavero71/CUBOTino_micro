@@ -41,7 +41,7 @@ else
     # ‘halt -p’ command shuts down the Raspberry pi
     # un-comment 'halt -p' command ONLY when the script works without errors
     # un-comment 'halt -p' command ONLY after making an image of the microSD
-    halt -p
+    #halt -p
 
 fi
 
