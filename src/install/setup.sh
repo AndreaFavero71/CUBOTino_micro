@@ -48,6 +48,7 @@ source .virtualenvs/bin/activate
 print_header "Installing required python packages"
 pip3 install numpy==1.21.4
 pip3 install "picamera[array]"
+pip3 install st7735==0.0.4.post1
 pip3 install st7789==0.0.4
 pip3 install RubikTwoPhase==1.1.1
 pip3 install getmac==0.8.3
