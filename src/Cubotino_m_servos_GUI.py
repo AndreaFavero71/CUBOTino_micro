@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 09 March 2023
+# Andrea Favero 10 March 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -36,6 +36,7 @@ from Cubotino_m_display import display as disp   # custom library controlling Cu
 # #################### functions to manage the GUI closing ###########################################################
 def on_closing():
     disp.show_cubotino()
+    print("\nclosing the GUI application\n\n")
     root.destroy()
 ######################################################################################################################
     
@@ -240,7 +241,7 @@ def save_new_settings():
         backup_fname = fname[:-4] + '_backup_' + datetime + '.txt' # backup file name
         with open(backup_fname, "w") as f:                         # original servo_settings are saved to a backup file with datetime ref
             f.write(json.dumps(robot_settings, indent=0))          # content of the setting file is saved
-            print("saving previous settings to backup file:", backup_fname)
+            print("\nsaving previous settings to backup file:", backup_fname)
         
         backup_fname = fname[:-4] + '_backup*.txt'                 # common name prefix for the backup files
         backup_files = sorted(glob.iglob(backup_fname), key=os.path.getmtime, reverse=True) # ordered list of backuped settings files 
@@ -252,7 +253,7 @@ def save_new_settings():
         robot_settings = update_settings_dict()                    # settings updated to sliders values
         with open(fname, "w") as f:                                # servo_settings file is opened in reading mode
             f.write(json.dumps(robot_settings, indent=0))          # content of the setting file is saved
-            print("saving settings to:", fname)
+            print("saving settings to:", fname)                    # feedback is printed to the terminal
     else:                                                          # case the servo_settings file exists
         print("fname does not exists at save_new_settings function")
 
@@ -306,48 +307,48 @@ def servo_close(val):
     t_servo_close = round(float(s_top_srv_close.get()),3)        # top servo pos to constrain the top cover on cube mid and top layer
     t_servo_rel = round(t_servo_close - float(s_top_srv_rel_delta.get()),3)
     disp.show_on_display('t_srv CLOSE', str(t_servo_close), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_close)  # top servo is positioned to the slider value
+    servo.servo_to_pos('top', t_servo_close)      # top servo is positioned to the slider value
     time.sleep(t_open_close_time)
-    servo.servo_to_pos('top', t_servo_rel)    # top servo is positioned to the slider value
+    servo.servo_to_pos('top', t_servo_rel)        # top servo is positioned to the slider value
     time.sleep(t_rel_time)
     disp.show_on_display('t_srv CLOSE', f'{t_servo_close} ({t_servo_rel})', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    t_servo_pos = 'close'                     # string variable to track the last top_cover position
-    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
+    t_servo_pos = 'close'                         # string variable to track the last top_cover position
+    btm_srv_widgets_status()                      # updates the bottom servo related widgests status, based on top servo pos
 
 
 def servo_release(val):
     global t_servo_rel_delta, t_servo_pos
     t_servo_rel_delta = round(float(s_top_srv_rel_delta.get()),3)  # top servo release position after closing toward the cube
     disp.show_on_display('t_srv RELEASE', f'({t_servo_rel_delta})', fs1=25, y2=75, fs2=30)  # feedback is printed to the display
-    t_servo_pos = 'close'                     # string variable to track the last top_cover position
-    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
+    t_servo_pos = 'close'                         # string variable to track the last top_cover position
+    btm_srv_widgets_status()                      # updates the bottom servo related widgests status, based on top servo pos
 
 
 def servo_open(val):
     global t_servo_open, t_servo_pos
     t_servo_open = round(float(s_top_srv_open.get()),3)  # top servo pos to free up the top cover from the cube
     disp.show_on_display('t_srv OPEN', str(t_servo_open), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_open)   # top servo is positioned to the slider value
-    t_servo_pos = 'open'                      # string variable to track the last top_cover position
-    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
+    servo.servo_to_pos('top', t_servo_open)       # top servo is positioned to the slider value
+    t_servo_pos = 'open'                          # string variable to track the last top_cover position
+    btm_srv_widgets_status()                      # updates the bottom servo related widgests status, based on top servo pos
     
 
 def servo_read(val):
     global t_servo_read, t_servo_pos
     t_servo_read = round(float(s_top_srv_read.get()),3)  # top servo pos for camera reading
     disp.show_on_display('t_srv READ', str(t_servo_read), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_read)   # top servo is positioned to the slider value
-    t_servo_pos = 'read'                      # string variable to track the last top_cover position
-    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
+    servo.servo_to_pos('top', t_servo_read)       # top servo is positioned to the slider value
+    t_servo_pos = 'read'                          # string variable to track the last top_cover position
+    btm_srv_widgets_status()                      # updates the bottom servo related widgests status, based on top servo pos
 
 
 def servo_flip(val):
     global t_servo_flip, t_servo_pos
     t_servo_flip = round(float(s_top_srv_flip.get()),3)  # top servo pos to flip the cube on one of its horizontal axis
     disp.show_on_display('t_srv FLIP', str(t_servo_flip), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    servo.servo_to_pos('top', t_servo_flip)   # top servo is positioned to the slider value
-    t_servo_pos = 'flip'                      # string variable to track the last top_cover position
-    btm_srv_widgets_status()                  # updates the bottom servo related widgests status
+    servo.servo_to_pos('top', t_servo_flip)       # top servo is positioned to the slider value
+    t_servo_pos = 'flip'                          # string variable to track the last top_cover position
+    btm_srv_widgets_status()                      # updates the bottom servo related widgests status, based on top servo pos
     
     
 def flip_to_close_time(val):
@@ -407,8 +408,8 @@ def servo_CCW(val):
     if t_servo_pos in ('close', 'open'):
         b_servo_CCW = round(float(s_btn_srv_CCW.get()),3)    # bottom servo position when fully CCW
         disp.show_on_display('b_srv CCW', str(b_servo_CCW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        servo.servo_to_pos('bottom', b_servo_CCW)            # bottom servo is positioned to the slider value
-        b_servo_pos = 'CCW'                                  # string variable to track the last holder position
+        servo.servo_to_pos('bottom', b_servo_CCW) # bottom servo is positioned to the slider value
+        b_servo_pos = 'CCW'                       # string variable to track the last holder position
     else:
         disp.show_on_display('t_srv', 'BLOCKING', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
     
@@ -418,8 +419,8 @@ def servo_home(val):
     if t_servo_pos in ('close', 'open'):
         b_home = round(float(s_btn_srv_home.get()),3)        # bottom servo home position
         disp.show_on_display('b_srv HOME', str(b_home), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        servo.servo_to_pos('bottom', b_home)                 # bottom servo is positioned to the slider value
-        b_servo_pos = 'home'                                 # string variable to track the last holder position
+        servo.servo_to_pos('bottom', b_home)      # bottom servo is positioned to the slider value
+        b_servo_pos = 'home'                      # string variable to track the last holder position
     else:
         disp.show_on_display('t_srv', 'BLOCKING', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
 
@@ -429,40 +430,45 @@ def servo_CW(val):
     if t_servo_pos in ('close', 'open'):
         b_servo_CW = round(float(s_btn_srv_CW.get()),3)      # bottom servo position when fully CW
         disp.show_on_display('b_srv CW', str(b_servo_CW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        servo.servo_to_pos('bottom', b_servo_CW)             # bottom servo is positioned to the slider value
-        b_servo_pos = 'CW'                                   # string variable to track the last holder position
+        servo.servo_to_pos('bottom', b_servo_CW)  # bottom servo is positioned to the slider value
+        b_servo_pos = 'CW'                        # string variable to track the last holder position
     else:
         disp.show_on_display('t_srv', 'BLOCKING', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
 
 
 def servo_rel_CCW(val):
     global b_rel_CCW
-    b_rel_CCW = round(float(s_btn_srv_rel_CCW.get()),3)  # bottom servo position small rotation back from CCW, to release tension
+    b_rel_CCW = round(float(s_btn_srv_rel_CCW.get()),3)      # bottom servo position small rotation back from CCW, to release tension
+    target = round(b_servo_CCW + b_rel_CCW,3)     # target position is defined by the b_servo_CCW AND b_rel_CCW
+    servo.servo_to_pos('bottom', target)          # bottom servo is positioned to the slider value
     disp.show_on_display('b_rel_CCW', str(b_rel_CCW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
 
 
 def servo_rel_CW(val):
     global b_rel_CW
-    b_rel_CW = round(float(s_btn_srv_rel_CW.get()),3)  # bottom servo position small rotation back from CW, to release tension
+    b_rel_CW = round(float(s_btn_srv_rel_CW.get()),3)        # bottom servo position small rotation back from CW, to release tension
     disp.show_on_display('b_rel_CW', str(b_rel_CW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
+    target = round(b_servo_CW - b_rel_CW,3)       # target position is defined by the b_servo_CW AND b_rel_CW
+    servo.servo_to_pos('bottom', target)          # bottom servo is positioned to the slider value
+    b_servo_pos = 'CW'                            # string variable to track the last holder position
 
 
 def servo_extra_home_CCW(val):
     global b_extra_home_CCW, b_servo_pos
     b_extra_home_CCW = round(float(s_extra_home_CCW.get()),3)  # bottom servo position extra rotation at home, to release tension
     disp.show_on_display('b_extra CCW', str(b_extra_home_CCW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    target = round(b_home + b_extra_home_CCW,3)                # target position is defined by the b_home AND b_extra_home_ccw
-    servo.servo_to_pos('bottom', target)                       # bottom servo is positioned to the slider value
-    b_servo_pos = 'CW'                                         # string variable to track the last holder position
+    target = round(b_home + b_extra_home_CCW,3)   # target position is defined by the b_home AND b_extra_home_ccw
+    servo.servo_to_pos('bottom', target)          # bottom servo is positioned to the slider value
+    b_servo_pos = 'CW'                            # string variable to track the last holder position
 
 
 def servo_extra_home_CW(val):
     global b_extra_home_CW, b_servo_pos
-    b_extra_home_CW = round(float(s_extra_home_CW.get()),3)    # bottom servo position extra rotation at home, to release tension
+    b_extra_home_CW = round(float(s_extra_home_CW.get()),3)  # bottom servo position extra rotation at home, to release tension
     disp.show_on_display('b_extra CW', str(b_extra_home_CW), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-    target = round(b_home - b_extra_home_CW,3)                 # target position is defined by the b_home AND b_extra_home_cw
-    servo.servo_to_pos('bottom', target)                       # bottom servo is positioned to the slider value
-    b_servo_pos = 'CW'                                         # string variable to track the last holder position
+    target = round(b_home - b_extra_home_CW,3)    # target position is defined by the b_home AND b_extra_home_cw
+    servo.servo_to_pos('bottom', target)          # bottom servo is positioned to the slider value
+    b_servo_pos = 'CW'                            # string variable to track the last holder position
 
 
 def servo_rotate_time(val):
@@ -471,7 +477,7 @@ def servo_rotate_time(val):
 
 def servo_rel_time(val):
     global b_rel_time
-    b_rel_time = round(float(s_btn_srv_rel_time.get()),3)      # time to rotate slightly back, to release tensions
+    b_rel_time = round(float(s_btn_srv_rel_time.get()),3)    # time to rotate slightly back, to release tensions
 
 def servo_spin_time(val):
     global b_spin_time
@@ -491,58 +497,57 @@ def servo_init():
     global t_servo_pos, b_servo_pos
     
     servo_init=servo.servo_tune_via_gui(debug=False, start_pos = 'open')  # servos are initialized, and set to their starting positions
-    if servo_init:                         # case the servo init has successed
-        t_servo_pos = 'start'              # string variable to track the last top_cover position
-        b_servo_pos = 'home'               # string variable to track the last holder position
-#         btm_srv_widgets_status()
+    if servo_init:                                # case the servo init has successed
+        t_servo_pos = 'start'                     # string variable to track the last top_cover position
+        b_servo_pos = 'home'                      # string variable to track the last holder position
 
 
 def close_top_cover():
     global t_servo_pos
-    servo.stop_release()                                        # servos are made activate in case aren't
-    if b_servo_pos in ('CCW', 'home', 'CW'):                    # case the holder allows the Lifter to be moved freely
+    servo.stop_release()                          # servos are made activate in case aren't
+    if b_servo_pos in ('CCW', 'home', 'CW'):      # case the holder allows the Lifter to be moved freely
         disp.show_on_display('t_srv CLOSE', str(t_servo_close), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
         
         # send the close_cover settings request to the robot
         t_servo_pos = servo.close_cover(t_servo_close, t_servo_rel_delta, t_open_close_time, t_rel_time, test=True)
         disp.show_on_display('t_srv CLOSE', f'{t_servo_close} ({t_servo_rel_delta})', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        btm_srv_widgets_status()
+        btm_srv_widgets_status()                  # updates the bottom servo related widgests status, based on top servo pos
 
 
 def open_top_cover():
     global t_servo_pos
-    servo.stop_release()                                        # servos are made activate in case aren't
+    servo.stop_release()                          # servos are made activate in case aren't
     if b_servo_pos in ('CCW', 'home', 'CW') and t_servo_pos != 'open':  # case the holder allows the Lifter to be moved freely
         t_servo_pos = servo.open_cover(t_servo_open, test=True) # send the open_cover settings request to the robot
         disp.show_on_display('t_srv OPEN', str(t_servo_open), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        btm_srv_widgets_status()
+        btm_srv_widgets_status()                  # updates the bottom servo related widgests status, based on top servo pos
         
 
 
 def read_position():
     global t_servo_read, t_servo_pos
-    servo.stop_release()                                        # servos are made activate in case aren't
+    servo.stop_release()                          # servos are made activate in case aren't
     if b_servo_pos in ('CCW', 'home', 'CW') and t_servo_pos != 'read':  # case the holder allows the Lifter to be moved freely
-        t_servo_pos = servo.servo_to_pos('top', t_servo_read)   # send the request of top_cover to read position 
+        t_servo_pos = servo.servo_to_pos('top', t_servo_read)  # send the request of top_cover to read position 
         disp.show_on_display('t_srv READ', str(t_servo_read), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        btm_srv_widgets_status()
+        btm_srv_widgets_status()                  # updates the bottom servo related widgests status, based on top servo pos
 
 
 def flip_cube():
     global t_servo_pos
-    servo.stop_release()                                        # servos are made activate in case aren't
-    if b_servo_pos in ('CCW', 'home', 'CW'):                    # case the holder allows the Lifter to be moved freely
+    servo.stop_release()                          # servos are made activate in case aren't
+    if b_servo_pos in ('CCW', 'home', 'CW'):      # case the holder allows the Lifter to be moved freely
         t_servo_pos = servo.flip_toggle(t_servo_pos, t_servo_read, t_servo_flip)      # send the flip_test request to the robot
-        if t_servo_pos == 'flip':                               # case the top_cover is in flip position
+        if t_servo_pos == 'flip':                 # case the top_cover is in flip position
             disp.show_on_display('t_srv FLIP', str(t_servo_flip), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        if t_servo_pos == 'read':                               # case the top_cover is in read position
+        if t_servo_pos == 'read':                 # case the top_cover is in read position
             disp.show_on_display('t_srv READ', str(t_servo_read), fs1=30, y2=75, fs2=30)  # feedback is printed to the display
-        btm_srv_widgets_status()
+        btm_srv_widgets_status()                  # updates the bottom servo related widgests status, based on top servo pos
 
 
 def ccw():
     global b_servo_pos
-    servo.stop_release()                                              # servos are made activate in case aren't
+    servo.stop_release()                                     # servos are made activate in case aren't
     
     if t_servo_pos == 'open':
         timer1 = b_spin_time
@@ -565,7 +570,7 @@ def home():
     global b_servo_pos
     
     if t_servo_pos in ('close', 'open') and b_servo_pos != 'home': # case the top_cover allows the holder to move freely
-        servo.stop_release()                                       # servos are made activate in case aren't
+        servo.stop_release()                                 # servos are made activate in case aren't
         if t_servo_pos == 'open':
             timer1 = b_spin_time
             if b_servo_pos == 'CCW':
@@ -589,7 +594,7 @@ def cw():
     global b_servo_pos
     
     if t_servo_pos in ('close', 'open') and b_servo_pos != 'CW':   # case the top_cover allows the holder to move freely
-        servo.stop_release()                                       # servos are made activate in case aren't
+        servo.stop_release()                                 # servos are made activate in case aren't
         if t_servo_pos == 'open':
             timer1 = b_spin_time
             if b_servo_pos == 'CCW':
@@ -615,15 +620,22 @@ def test():
     
     servo.stop_release()                         # servos are made activate in case aren't
     read_position()                              # top_servo positioned to read_position, as meant to be the start position after scanning
-    servo.test_set_of_movements()                # function to verify the servos while solving a predefined robot movement string 
-    
+    result = servo.test_set_of_movements()       # function to verify the servos while solving a predefined robot movement string
+
+    if result == 'stopped':                      # case the test has been interrupted
+        servo_init()                             # servos are initialized
+    elif result == 'completed':                  # case the test has reached the end
+        open_top_cover()                         # top servo is positioned to open
+        time.sleep(0.5)                          # little delay to give the servo time to reach the target
+        home()                                   # bottom servo is positioned to home
+        
     for label in (top_srv_label, btn_srv_label): # iterations throught the labels (of sliders) in tuple
         enable_widgets(label, relief="raised")   # widgets are enabled
     
     for label in (test_label, large_test_label, files_label):  # iterations throught the labels (of buttons) in tuple
         enable_widgets(label, relief="raised")   # widgets are enabled
-
-
+    
+    btm_srv_widgets_status()                     # bottom servo widgets are updated according to the top servo position
 
 
 
@@ -952,6 +964,6 @@ test_btn.grid(row=0, column=0, sticky="w", padx=20, pady=10)
 # ###############################     main part   ####################################################################
 # ####################################################################################################################
 
-btm_srv_widgets_status()
-root.protocol("WM_DELETE_WINDOW", on_closing)
-root.mainloop()   # tkinter main loop
+btm_srv_widgets_status()                         # bottom servo widgets are updated according to the top servo position
+root.protocol("WM_DELETE_WINDOW", on_closing)    # closing the GUI
+root.mainloop()                                  # tkinter main loop

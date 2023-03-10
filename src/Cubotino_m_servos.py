@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero 04 March 2023
+# Andrea Favero 10 March 2023
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino series.
@@ -1072,7 +1072,6 @@ def servo_solve_cube(moves, scrambling=False, print_out=s_debug, test=False):
         
     elif not stop_servos:                          # case there is not a stop request for servos
         robot_status_='Cube_solved'                # string variable indicating how the servo_solve_cube function has ended
-        
         if print_out:                              # case the print_out variable is set true
             if tot_moves!=0:                       # case the robot was supposed to have movements
                 print("\nCompleted all the servo movements")  # feedback is printed to the terminal
@@ -1390,13 +1389,16 @@ def test_set_of_movements():
         
         robot_status, robot_time = servo_solve_cube(movements, print_out=s_debug, test=True) # robot solver is called
 
-        if robot_status == 'Cube_solved':                                # case the robot solver returns Cube_solved in the robot_status
-            print(f"Solving time: {round(robot_time,1)} secs")          # print the solving time as feedback
+        if robot_status == 'Cube_solved':                       # case the robot solver returns Cube_solved in the robot_status
+            print(f"Solving time: {round(robot_time,1)} secs")  # print the solving time as feedback
             s_disp.show_on_display('TEST TIME:', str(round(robot_time,1)) + 's', fs1=32, y2=75, fs2=36)  # feedback is printed to the display
-            time.sleep(3)
+            time.sleep(3)                                       # litle delay for display reading
+            robot_init_status=False                             # boolean to track the servos inititialization status
+            return 'completed'                                  # string 'completed' is returned
             
-        elif robot_status == 'Robot_stopped':                            # case the robot solver returns Robot_stopped in the robot_status
+        elif robot_status == 'Robot_stopped':                   # case the robot solver returns Robot_stopped in the robot_status
             print(f"Robot has been stopped, after {round(robot_time,1)} secs")  # print the status as feedback
+            return 'stopped'                                    # string 'stopped' is returned
 
 #     s_disp.set_backlight(0)                # de-activates the display backlight
 
