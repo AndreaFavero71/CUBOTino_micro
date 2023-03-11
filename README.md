@@ -3,7 +3,7 @@
 This repo contains the relevant files to make CUBOTino micro: World's smallest Rubik's cube solver robot. <br />
 ![title image](/images/title.jpg)
 
-More info will be made available at: https://www.instructables.com/member/AndreaFavero/
+More info are available at: https://www.instructables.com/CUBOTtino-Micro-the-Worlds-Smallest-Rubiks-Cube-So/
 
 An impression of the robot: https://youtu.be/EbOHhvg2tJE
 
