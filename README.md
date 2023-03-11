@@ -33,6 +33,8 @@ cd ~/cubotino_micro/src
 source .virtualenvs/bin/activate
 python Cubotino_m_servos_GUI.py
 ```
+![title image](/images/Servo_tuning_GUI_01.PNG)
+
 
 # Starting the solver manually
 From a shell, you can run the main python script like this:
