@@ -10,7 +10,7 @@ An impression of the robot: https://youtu.be/EbOHhvg2tJE
 
 
 # How to use it:
-1. Flash your SD card according to the procedure in the [document here](doc/How_to_make_CUBOTino_micro_20230311.pdf) , Chapter 12, Step1 and Step2.
+1. Flash your SD card according to the procedure in the [document here](doc/How_to_make_CUBOTino_micro_20230319.pdf) , Chapter 12, Step1 and Step2.
 2. Put the sd card in the pi and power it. You can monitor the boot process if you connect an hdmi monitor to it but it is not essential. 
 3. Try to connect to the Raspberry Pi via SSH. On Windows you can use Putty. On linux and mac you can type directly:
 ```
@@ -25,6 +25,10 @@ sudo ./install/setup.sh
 ```
 6. Make sure the script runs without error until the end. It should ask you to reboot. Type 'y' and hit enter. You should get the proper environment after reboot at that point
 7. If there is any error during the script execution try to fix it and rerun the script again
+
+
+# Build the robot:
+Follow the instructions (saved at /doc folder)
 
 
 # Tuning the servos position via GUI (via VNC):
