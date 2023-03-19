@@ -3,7 +3,7 @@
 
 """ 
 #############################################################################################################
-#  Andrea Favero, 08 March 2023
+#  Andrea Favero, 19 March 2023
 #
 #
 #  This code relates to CUBOTino autonomous, a very small and simple Rubik's cube solver robot 3D printed.
@@ -31,7 +31,7 @@
 """
 
 # __version__ variable
-version = '0.1'
+version = '0.2'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -93,15 +93,15 @@ args = parser.parse_args()   # argument parsed assignement
 
 
 
+macs_AF = ('e4:5f:01:8d:59:97', 'b8:27:eb:b5:43:6b')
 
 
-
-def import_parameters():
+def import_parameters(debug=False):
     """ Function to import parameters from a json file, to make easier to list/document/change the variables
         that are expected to vary on each robot."""
        
     global frameless_cube, camera_width_res, camera_height_res, s_mode
-    global kl, x_l, x_r, y_u, y_b, warp_fraction, warp_slicing, square_ratio, rhombus_ratio
+    global kl, x_l, x_r, y_u, y_b, w_f, w_s, square_ratio, rhombus_ratio
     global delta_area_limit, sv_max_moves, sv_max_time, collage_w, marg_coef, cam_led_bright, cam_led_auto
     global detect_timeout, show_time, warn_time, quit_time, cover_self_close, vnc_delay
     global pathlib, json
@@ -113,7 +113,7 @@ def import_parameters():
        
     folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                   # mac address is retrieved
-    if eth_mac == 'e4:5f:01:8d:59:97':                            # case the script is running on AF (Andrea Favero) robot
+    if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
         fname = os.path.join(folder,'Cubotino_m_settings_AF.txt') # AF robot settings (do not use these at the start)
     else:                                                         # case the script is not running on AF (Andrea Favero) robot
         fname = os.path.join(folder,'Cubotino_m_settings.txt')    # folder and file name for the settings, to be tuned
@@ -162,10 +162,10 @@ def import_parameters():
             x_r = int(settings['x_r'])                                # image crop on right (before warping)
             y_u = int(settings['y_u'])                                # image crop on top (before warping)
             y_b = int(settings['y_b'])                                # image crop on bottom (before warping)
-            warp_fraction = float(settings['warp_fraction'])          # coeff for warping the image
-            warp_slicing = float(settings['warp_slicing'])            # coeff for cropping the bottom warped image
-            if warp_slicing == 0:                                     # case the parameter equals to zero
-                warp_slicing = 0.1                                    # the parameter is set to 0.1
+            w_f = float(settings['warp_fraction'])                    # coeff for warping the image
+            w_s = float(settings['warp_slicing'])                     # coeff for cropping the bottom warped image
+            if w_s == 0:                                              # case the parameter equals to zero
+                w_s = 0.1                                             # the parameter is set to 0.1
             square_ratio = float(settings['square_ratio'])            # acceptance threshold for square sides difference
             rhombus_ratio = float(settings['rhombus_ratio'])          # acceptance threshold for rhombus axes difference
             delta_area_limit = float(settings['delta_area_limit'])    # acceptance threshold for facelet area dev from median
@@ -356,7 +356,7 @@ def webcam():
         print('PiCamera mode (binning):', binning) # feedback is printed to the terminal
     
     # case cube side is zero, no request to stop the robot and not automated cycles
-    if side == 0 and not robot_stop and cycles_num == 0:
+    if side == 0 and not robot_stop and cycles_num == 0 and not picamera_test:
         print('PiCamera resolution (width x height): ',camera.resolution)  # feedback is printed to the terminal
     
     return camera, rawCapture, width, height
@@ -376,7 +376,7 @@ def robot_camera_warmup(camera, start_time):
     To properly cover all the possible situations, this fuction releases the camera warm-up phase only after
     all the gains are stable, meaning an absolute variation < 2% from the average of last 2 seconds."""
     
-    
+
     if not robot_stop:
         disp.show_on_display('CAMERA', 'SETUP', fs1=40, fs2=42)  # feedback is printed to the display
         print('\nPiCamera: waiting for AWB and Exposure gains to get stable')  # feedback is printed to the terminal
@@ -457,7 +457,6 @@ def robot_camera_warmup(camera, start_time):
                     cv2.moveWindow('cube', 0,0)      # move the window to (0,0)
                 cv2.imshow('cube', frame)            # shows the frame 
                 cv2.waitKey(1)                       # refresh time is minimized to 1ms  
-        
         
         print(f'PiCamera: AWB and Exposure being stable in {round(t_list[-1],1)} secs')
         if screen:                                        # case screen variable is set true on __main__
@@ -569,15 +568,14 @@ def read_camera():
     
     else:                                                         # case the frame is not empty
         if not picamera_test:                                     # case picamera_test is false
-            frame, w, h = frame_cropping(frame, width, height)    # frame is cropped in order to limit the image area to analyze
-            frame, w, h = warp_image(frame, w, h)                 # frame is warped to have a top like view toward the top cube face
+            frame, w, h = frame_cropping(frame, width, height, x_l, x_r, y_u, y_b)  # frame is cropped in order to limit the image area to analyze
+            frame, w, h = warp_image(frame, w, h, w_f, w_s)       # frame is warped to have a top like view toward the top cube face
             scale = 0.75 if cv_wow else 0.8                       # scaling factor according to cv_wow i 
             frame, w, h = frame_resize(frame, w, h, scale=scale)  # frame is resized (to smaller size), to gain some speed
         
         elif picamera_test:                                       # case picamera_test is True:
             w = width                                             # widht is assigned to w
             h = height                                            # height is assigned to h
-            frame, w, h = warp_image(frame, w, h)                 # frame is warped to have a top like view toward the top cube face
         
         oneframe = True                                           # flag for a single frame analysis at the time
         rawCapture.truncate(0)                                    # empties the array in between each camera's capture      
@@ -589,7 +587,7 @@ def read_camera():
 
 
             
-def frame_cropping(frame, width, height):
+def frame_cropping(frame, width, height, x_l, x_r, y_u, y_b):
     """Frame cropping, to prevent reading the back cube side and to increase overal speed.
     Due to short camera distance from the cube, all the PiCamera sensor area is used,
     therefore pixels reduction is beneficial ro reduce overall memory load.
@@ -618,7 +616,7 @@ def frame_cropping(frame, width, height):
 
 
 
-def warp_image(frame, w, h):
+def warp_image(frame, w, h, w_f, w_s):
     """ Warp the image to remove perspective and simulate a top like view.
     This because PiCamera is at an angle with reference to the top cube face.
     This allows to analyse the facelets contours (square like, area, etc) in a more precise way.
@@ -634,19 +632,20 @@ def warp_image(frame, w, h):
         hh = h                        # frame height before warping is assigned to a local variable
     
     grid_vertices = np.float32([[0,0], [h,0], [h,w], [0,w]])  # original frame vertices
-#     warp_fraction = 7           #(AF 7) fractional frame width part to be 'removed' on top left and right of the frame
-    d_x = int(w/warp_fraction)  # pixels to 'remove' on top left and top righ sides of frame, to warp the image
+
+#     w_f = 7           #(AF 7) fractional frame width part to be 'removed' on top left and right of the frame    
+    d_x = int(w/w_f)            # pixels to 'remove' on top left and top righ sides of frame, to warp the image
     straight = 1+d_x/h          # corrects the cube face deformation 
 
-    warped_vertices = np.float32([[d_x,0], [h,0], [int(straight*h),w], [-d_x, w]])       # frame coordinates for the transformation matrix
-    matrix = cv2.getPerspectiveTransform(warped_vertices, grid_vertices)                 # compute perspective matrix
+    warped_vertices = np.float32([[d_x,0], [h,0], [int(straight*h),w], [-d_x, w]])  # frame coordinates for the transformation matrix
+    matrix = cv2.getPerspectiveTransform(warped_vertices, grid_vertices)            # compute perspective matrix
 
     # do perspective transformation, by adding black pixels where needed
     frame = cv2.warpPerspective(frame, matrix, (max(w,h), max(w,h)), cv2.INTER_LINEAR, cv2.BORDER_CONSTANT, borderValue=(0,0,0))
     
-#     warp_slicing = 1.5                   #(AF 1.5)  # Fractional part of the warping portion to be used as slicing from frame bottom
-    frame = frame[: -d_x, :-int(d_x/warp_slicing)]   # frame slicing to remove part of the added (black) pixels on the right frame side 
-    h, w = frame.shape[:2]                           # new frame height and width
+#     w_s = 1.5                   #(AF 1.5)  # Fractional part of the warping portion to be used as slicing from frame bottom
+    frame = frame[: -d_x, :-int(d_x/w_s)]   # frame slicing to remove part of the added (black) pixels on the right frame side 
+    h, w = frame.shape[:2]                  # new frame height and width
     
     if cv_wow:                                           # case the cv image analysis plot is set true
         pre_warp, _, _ = frame_resize(pre_warp, ww, hh)  # re-sized frame is assigned to the pre_warp global variable
@@ -3258,7 +3257,7 @@ def quit_func(quit_script, error = False):
     elif quit_script:                             # case the quit_script is set true (long button pressing)
         print('script quitting request')          # feedback is printed to the terminal
         
-        if not error:                             # case no errors were raised by the script
+        if not (error or picamera_test):          # case no errors were raised by the script
             try:                                  # tentative
                 disp.set_backlight(1)             # display backlight is turned on, in case it wasn't
                 disp.show_on_display('SHUTTING', 'OFF', fs1=36, y2=75, fs2=42) # feedback is printed to the display
@@ -3284,6 +3283,8 @@ def quit_func(quit_script, error = False):
                 pass
         
         try:
+            servo.servo_off()         # PWM is stopped at the servos GPIO pins
+            tikme.sleep(0.1)          # little delay
             servo.quit_func()         # sets to low the GPIO pins used as output
         except:
             print("raised exception while servo.quit_func at script quitting")   # feedback is printed to the terminal
@@ -3326,18 +3327,21 @@ def quit_func(quit_script, error = False):
         
         # below if block is to kill the bash process that has eventually y launcged this script.
         # this approach helps during development, to stop the script without starting the Rpi shutt off process
-        if not GPIO.input(solve_btn) or not GPIO.input(scramble_btn):        # case both buttons are pressed
-            disp.set_backlight(1)   # display backlight is turned on for the first time
-            disp.show_on_display('EXITING', 'SCRIPT', fs1=36, y2=75, fs2=42) # feedback is printed to the display
-            time.sleep(1)                           # some little delay
-            process_to_kill = "Cubotino_m_bash.sh | grep -v grep | grep -v Cubotino_m_terminal.log"  # string to find the process PID to kill
-            nikname = "Cubotino_m_bash.sh"          # process name
-            kill_process(process_to_kill, nikname)  # call to the killing function
-            time.sleep(1)                           # some little delay
-            disp.show_on_display('SCRIPT', 'ENDED', fs1=36, y2=75, fs2=42) # feedback is printed to the display
-            time.sleep(2)                           # some little delay
-            disp.set_backlight(0)                   # display backlight is turned off
-            sys.exit(2)               # script is quitted with error 2 (right after killing the bash script)
+        try: 
+            if not GPIO.input(solve_btn) or not GPIO.input(scramble_btn):        # case both buttons are pressed
+                disp.set_backlight(1)   # display backlight is turned on for the first time
+                disp.show_on_display('EXITING', 'SCRIPT', fs1=36, y2=75, fs2=42) # feedback is printed to the display
+                time.sleep(1)                           # some little delay
+                process_to_kill = "Cubotino_m_bash.sh | grep -v grep | grep -v Cubotino_m_terminal.log"  # string to find the process PID to kill
+                nikname = "Cubotino_m_bash.sh"          # process name
+                kill_process(process_to_kill, nikname)  # call to the killing function
+                time.sleep(1)                           # some little delay
+                disp.show_on_display('SCRIPT', 'ENDED', fs1=36, y2=75, fs2=42) # feedback is printed to the display
+                time.sleep(2)                           # some little delay
+                disp.set_backlight(0)                   # display backlight is turned off
+                sys.exit(2)           # script is quitted with error 2 (right after killing the bash script)
+        except:
+            pass
         
         if error:                     # case an error has been raised by the script
             sys.exit(1)               # script is quitted with error
@@ -3411,7 +3415,7 @@ def kill_process(process, nikname):
 
 
 def test_picamera():
-    """funtion to allow a quick fedback of PiCamera working fine, when the robot is not fully assembled yet."""
+    """funtion to allow a quick feedback of PiCamera working fine, when the robot is not fully assembled yet."""
     
     global PiRGBArray, PiCamera, np, time, cv2
     global side, robot_stop, cycles_num, camera, rawCapture, width, height
@@ -3471,7 +3475,79 @@ def test_picamera():
 
 
 
-def start_up(first_cycle=False):
+def tune_image_setup(display, gui_debug):
+    
+    global PiRGBArray, PiCamera, np, time, sys, cv2
+    global disp, debug, screen, robot_stop, picamera_test, cv_wow, Rpi_ZeroW, side, cycles_num
+    global camera, rawCapture, width, height
+    
+    # import libraries
+    from picamera.array import PiRGBArray           # Raspberry pi specific package for the camera, using numpy array
+    from picamera import PiCamera                   # Raspberry pi specific package for the camera
+    import numpy as np                              # data array management
+    import time                                     # time package
+    import sys                                      # Python Runtime Environment livrary
+    import cv2                                      # computer vision package
+    
+    disp = display                                  # display object, defined on the GUI sript
+    debug = gui_debug                               # debug variable set in the GUI script
+    screen = True                                   # scrren is always true when using the GUI
+    robot_stop = False                              # false is assigned to robot_stop (variable used by webcam() function)
+    picamera_test = True                            # this variable helps to use limited functionality from this script
+    cv_wow = False                                  # cw_wow is set false
+    Rpi_ZeroW = True                                # Rpi_ZeroW is set true for larger compatibility
+    import_parameters(debug)                        # imports the robot parameters (not the servo ones)
+    side = 0                                        # zero is assigned to side (variable used by webcam() function)
+    cycles_num = 0                                  # zero is assigned to cycles_num (variable used by webcam() function)
+    camera, rawCapture, width, height = webcam()    # camera is defined
+    
+    return cv2, camera, width, height
+
+
+
+
+
+# def tune_image(x_l, x_r, y_u, y_b, w_f, w_s):
+#     """funtion showing a PiCamera image after cropping and warping, for tuning purpose."""
+#        
+#   
+#     frame, w, h = read_camera()                     # video stream and frame dimensions
+#     
+#     # frame is cropped in order to limit the image area to analyze
+#     frame2, w2, h2 = frame_cropping(frame, width, height, x_l, x_r, y_u, y_b)
+# 
+#     # frame is warped to have a top like view toward the top cube face
+#     frame2, w2, h2 = warp_image(frame2, w2, h2, w_f, w_s)
+#     
+#     cv2.namedWindow('Camera image')                 # create the cube window
+#     cv2.moveWindow('Camera image', 0,0)             # move the window to (0,0)
+#     cv2.imshow('Camera image', frame)               # shows the frame
+#     cv2.namedWindow('Cropped image')                # create the cube window
+#     cv2.moveWindow('Cropped image', 0,height+60)    # move the window to (0,0)
+#     cv2.imshow('Cropped image', frame2)             # shows the frame 
+#     
+#     key = cv2.waitKey(10000)                        # refresh time is set to 1 second
+#  
+#     
+#     try:                                            # tentative
+#         close_camera()                              # close the camera object
+#     except:                                         # case of exception
+#         pass                                        # do nothing
+#     
+#     try:                                            # tentative
+#         cv2.destroyAllWindows()                     # all open windows are closed
+#     except:                                         # case of exception
+#         pass                                        # do nothing
+#     
+# #     quit_func(quit_script=True)                     # quitting funtion is used to close all the threads and the script
+
+
+
+
+
+
+
+def start_up(first_cycle=False, set_cropping=False):
     """ Start up function, that aims to run (once) all the initial settings needed."""
     
     # global variables
@@ -3495,7 +3571,7 @@ def start_up(first_cycle=False):
     timeout = False                  # timeout flag is initialli set on False
     
     # series actions, or variables setting, to be done only at the first cycle
-    if first_cycle:
+    if first_cycle and not set_cropping:
         cpu_temp(side=10, delay=3)   # cpu temp is checked at start-up
         time_system_synchr()  # checks the time system status (if internet connected, it waits till synchronization)
         
@@ -3718,7 +3794,8 @@ if __name__ == "__main__":
         2) some general settings (if to printout debug prints, internet connection / time synchronization, if screen connected, etc)
         3) waits for user to press the button, and it starts the cube reading phase."""
     
-    global camera, rawCapture, width, height, robot_stop, robot_idle, timeout, Rpi_ZeroW, cycles_num, picamera_test, motors_hw
+    global camera, rawCapture, width, height, robot_stop, robot_idle, timeout
+    global Rpi_ZeroW, cycles_num, picamera_test, motors_hw
 
     
     ################    general settings on how the robot is operated ###############################
@@ -3756,7 +3833,7 @@ if __name__ == "__main__":
     if args.picamera_test != None:    # case 'picamera_test' argument exists
         if args.picamera_test:        # case the Cubotino_m.py has been launched with 'picamera_test' argument
             picamera_test = True      # flag to enable/disable the PiCamera test is set True
-
+    
     motors_hw = True                  # flag to enable/disable the servos and motors
     if args.no_motors != None:        # case 'motors_hw' argument exists
         if args.no_motors:            # case the Cubotino_m.py has been launched with 'motors_hw' argument
@@ -3858,7 +3935,7 @@ if __name__ == "__main__":
             print('\nCube status detection set for both cubes with and without black frame')   # feedback is printed to the terminal 
             print('This setting takes slightly longer time for the cube status detection\n')   # feedback is printed to the terminal
         
-        if picamera_test:                                 # case the picamera_test is set true (servos disabling)
+        if picamera_test:                                 # case picamera_test is set true (servos disabling)
             print(f'\nPiCamera test enabled')             # feedback is printed to the terminal
             test_picamera()                               # test_picamera func is called
         

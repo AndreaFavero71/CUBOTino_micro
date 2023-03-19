@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 10 March 2023
+# Andrea Favero 19 March 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -13,6 +13,8 @@
 """
 
 
+macs_AF = ('e4:5f:01:8d:59:97', 'b8:27:eb:b5:43:6b')
+
 
 # ################################## Imports  ########################################################################
 
@@ -21,13 +23,19 @@ import tkinter as tk                 # GUI library
 from tkinter import ttk              # GUI library
 import datetime as dt                # date and time library used as timestamp on a few situations (i.e. data log)
 import time                          # import time library  
-import glob, os.path, pathlib         # os is imported to ensure the file presence, check/make
+import glob, os.path, pathlib        # os is imported to ensure the file presence, check/make
 import json                          # libraries needed for the json, and parameter import
 from getmac import get_mac_address   # library to get the device MAC ddress
 
+
 # project specific libraries  
 import Cubotino_m_servos as servo    # custom library controlling Cubotino servos and led module
-from Cubotino_m_display import display as disp   # custom library controlling Cubotino disply module
+from Cubotino_m_display import display as disp           # custom library controlling Cubotino disply module
+from Cubotino_m import tune_image_setup as camera_setup  # import the camera setting up function
+from Cubotino_m import read_camera as read_camera        # import the camera reading function
+from Cubotino_m import frame_cropping as crop            # import the image cropping function
+from Cubotino_m import warp_image as warp                # import the image warping function
+from Cubotino_m import close_camera as close_cam         # import the close_camera function
 ######################################################################################################################
 
 
@@ -35,16 +43,69 @@ from Cubotino_m_display import display as disp   # custom library controlling Cu
 
 # #################### functions to manage the GUI closing ###########################################################
 def on_closing():
-    disp.show_cubotino()
-    print("\nclosing the GUI application\n\n")
-    root.destroy()
+    disp.show_cubotino()                         # cubotino logo is plot to the screen
+    print("\nclosing the GUI application\n\n")   # feedback is printed to the terminal
+    camWindow.destroy()                          # frame camWindow is destroyied
+    servoWindow.destroy()                        # frame servoWindow is destroyied
+    servo.servo_off()                            # PWM signal interruption toward the servos (free to be manually moved)
+    close_cam()                                  # close the camera object
+    time.sleep(0.5)                              # little delay
+    root.destroy()                               # main window is destroyed
 ######################################################################################################################
-    
-    
-    
 
-# #################### functions to manage settings from/to files   ##################################################
-def read_settings_file(fname=''):
+
+
+
+# #################### functions to take and show images  ############################################################
+def take_image(refresh=1, widgets_freeze=True):
+    """funtion showing a PiCamera image after cropping and warping, for tuning purpose."""
+    global picamera_initialized, cv2, camera, width, height
+    
+    if widgets_freeze:
+        labels = (crop_label, warp_label, cam_files_label)
+        for label in labels:
+            disable_widgets(label, relief="sunken")
+        root.update()                          # forced a graphic update
+
+    if not picamera_initialized:               # case the picamera_initialized variable is False
+        # initial settings: upload cv2, make the camera object, etc
+        cv2, camera, width, height = camera_setup(display=disp, gui_debug=False)  
+        picamera_initialized = True            # picamera_initialized variable is set True
+    
+    servo.cam_led_On(1)                        # top_cover led is activated
+    frame, w, h = read_camera()                # video stream and frame dimensions
+    servo.cam_led_Off()                        # top_cover led is de-activated
+    
+    try:
+        # frame is cropped in order to limit the image area to analyze
+        frame2, w2, h2 = crop(frame, width, height, x_l, x_r, y_u, y_b)
+        
+        # frame is warped to have a top like view toward the top cube face
+        frame2, w2, h2 = warp(frame2, w2, h2, warp_fraction, warp_slicing)
+        
+        for i in range(refresh):
+            cv2.namedWindow('Cropped and warped image')      # create the cube window
+            cv2.moveWindow('Cropped and warped image', 0,40) # move the window to (0,0)
+            cv2.imshow('Cropped and warped image', frame2)   # shows the frame
+#             cv2.namedWindow('Camera image')                  # create the cube window
+#             cv2.moveWindow('Camera image', 0,h2+100)         # move the window right below the modified one
+#             cv2.imshow('Camera image', frame)                # shows the frame
+            key = cv2.waitKey(100)                           # refresh time is set to 1 second
+        
+    except:
+        print("Error or cropping and/or warping, try less extreme values")
+    
+    if widgets_freeze:
+        for label in labels:
+            enable_widgets(label, relief="raised")   # widgets are enabled
+        root.update()                                # forced a graphic update
+######################################################################################################################
+
+
+
+
+# #################### functions to manage servos settings from/to files   ###########################################
+def read_servo_settings_file(fname=''):
     """ Function to assign the servo settings to a dictionary, after testing their data type."""   
     
     import os.path, pathlib, json                                    # libraries needed for the json, and parameter import
@@ -54,63 +115,60 @@ def read_settings_file(fname=''):
     if len(fname) == 0:                                              # case fname equals empty string
         folder = pathlib.Path().resolve()                            # active folder (should be home/pi/cube)  
         eth_mac = get_mac_address()                                  # mac address is retrieved
-        if eth_mac == AF_mac:                                        # case the script is running on AF (Andrea Favero) robot
+        if eth_mac in macs_AF:                                       # case the script is running on AF (Andrea Favero) robot
             fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
         else:                                                        # case the script is not running on AF (Andrea Favero) robot
             fname = os.path.join(folder,'Cubotino_m_servo_settings.txt') # folder and file name for the settings, to be tuned
     
-    settings = {}
+    srv_settings = {}
     if os.path.exists(fname):                                        # case the servo_settings file exists
         with open(fname, "r") as f:                                  # servo_settings file is opened in reading mode
-            servo_settings = json.load(f)                            # json file is parsed to a local dict variable
+            srv_settings = json.load(f)                              # json file is parsed to a local dict variable
         
         try:           
             # dict with all the servos settings from the txt file
-            # from the dict obtained via json.load the settings dict adds individual data type check
-            settings['t_min_pulse_width'] = float(servo_settings['t_min_pulse_width'])   # defines the min Pulse With the top servo reacts to
-            settings['t_max_pulse_width'] = float(servo_settings['t_max_pulse_width'])   # defines the max Pulse With the top servo reacts to
-            settings['t_servo_close'] = float(servo_settings['t_servo_close'])           # Top_cover close position, in gpiozero format
-            settings['t_servo_open'] = float(servo_settings['t_servo_open'])             # Top_cover open position, in gpiozero format
-            settings['t_servo_read'] = float(servo_settings['t_servo_read'])             # Top_cover camera read position, in gpiozero format
-            settings['t_servo_flip'] = float(servo_settings['t_servo_flip'])             # Top_cover flip position, in gpiozero format
-            settings['t_servo_rel_delta'] = float(servo_settings['t_servo_rel_delta'])   # Top_cover release angle movement from the close position to release tension
-            settings['t_flip_to_close_time'] = float(servo_settings['t_flip_to_close_time'])  # time for Top_cover from flip to close position
-            settings['t_close_to_flip_time'] = float(servo_settings['t_close_to_flip_time'])  # time for Top_cover from close to flip position 
-            settings['t_flip_open_time'] = float(servo_settings['t_flip_open_time'])     # time for Top_cover from open to flip position, and viceversa
-            settings['t_open_close_time'] = float(servo_settings['t_open_close_time'])   # time for Top_cover from open to close position, and viceversa
-            settings['t_rel_time'] = float(servo_settings['t_rel_time'])                 # time for Top_cover to release tension from close position
+            # from the dict obtained via json.load the srv_settings dict adds individual data type check
+            srv_settings['t_min_pulse_width'] = float(srv_settings['t_min_pulse_width'])   # defines the min Pulse With the top servo reacts to
+            srv_settings['t_max_pulse_width'] = float(srv_settings['t_max_pulse_width'])   # defines the max Pulse With the top servo reacts to
+            srv_settings['t_servo_close'] = float(srv_settings['t_servo_close'])           # Top_cover close position, in gpiozero format
+            srv_settings['t_servo_open'] = float(srv_settings['t_servo_open'])             # Top_cover open position, in gpiozero format
+            srv_settings['t_servo_read'] = float(srv_settings['t_servo_read'])             # Top_cover camera read position, in gpiozero format
+            srv_settings['t_servo_flip'] = float(srv_settings['t_servo_flip'])             # Top_cover flip position, in gpiozero format
+            srv_settings['t_servo_rel_delta'] = float(srv_settings['t_servo_rel_delta'])   # Top_cover release angle movement from the close position to release tension
+            srv_settings['t_flip_to_close_time'] = float(srv_settings['t_flip_to_close_time'])  # time for Top_cover from flip to close position
+            srv_settings['t_close_to_flip_time'] = float(srv_settings['t_close_to_flip_time'])  # time for Top_cover from close to flip position 
+            srv_settings['t_flip_open_time'] = float(srv_settings['t_flip_open_time'])     # time for Top_cover from open to flip position, and viceversa
+            srv_settings['t_open_close_time'] = float(srv_settings['t_open_close_time'])   # time for Top_cover from open to close position, and viceversa
+            srv_settings['t_rel_time'] = float(srv_settings['t_rel_time'])                 # time for Top_cover to release tension from close position
     
-            settings['b_min_pulse_width'] = float(servo_settings['b_min_pulse_width'])   # defines the min Pulse With the bottom servo reacts to
-            settings['b_max_pulse_width'] = float(servo_settings['b_max_pulse_width'])   # defines the max Pulse With the bottom servo reacts to
-            settings['b_servo_CCW'] = float(servo_settings['b_servo_CCW'])               # Cube_holder max CCW angle position
-            settings['b_servo_CW'] = float(servo_settings['b_servo_CW'])                 # Cube_holder max CW angle position
-            settings['b_home'] = float(servo_settings['b_home'])                         # Cube_holder home angle position
-            settings['b_rel_CCW'] = float(servo_settings['b_rel_CCW'])                   # Cube_holder release angle at CCW angle positions, to release tension
-            settings['b_rel_CW'] = float(servo_settings['b_rel_CW'])                     # Cube_holder release angle at CW angle positions, to release tension
-            settings['b_extra_home_CW'] = float(servo_settings['b_extra_home_CW'])       # Cube_holder release angle from CW to home positions to release tension
-            settings['b_extra_home_CCW'] = float(servo_settings['b_extra_home_CCW'])     # Cube_holder release angle from CCW to home positions to release tension
-            settings['b_spin_time'] = float(servo_settings['b_spin_time'])               # time for Cube_holder to spin 90 deg (cune not contrained)
-            settings['b_rotate_time'] = float(servo_settings['b_rotate_time'])           # time for Cube_holder to rotate 90 deg (cube constrained)
-            settings['b_rel_time'] = float(servo_settings['b_rel_time'])                 # time for Cube_holder to release tension at home, CCW and CW positions
+            srv_settings['b_min_pulse_width'] = float(srv_settings['b_min_pulse_width'])   # defines the min Pulse With the bottom servo reacts to
+            srv_settings['b_max_pulse_width'] = float(srv_settings['b_max_pulse_width'])   # defines the max Pulse With the bottom servo reacts to
+            srv_settings['b_servo_CCW'] = float(srv_settings['b_servo_CCW'])               # Cube_holder max CCW angle position
+            srv_settings['b_servo_CW'] = float(srv_settings['b_servo_CW'])                 # Cube_holder max CW angle position
+            srv_settings['b_home'] = float(srv_settings['b_home'])                         # Cube_holder home angle position
+            srv_settings['b_rel_CCW'] = float(srv_settings['b_rel_CCW'])                   # Cube_holder release angle at CCW angle positions, to release tension
+            srv_settings['b_rel_CW'] = float(srv_settings['b_rel_CW'])                     # Cube_holder release angle at CW angle positions, to release tension
+            srv_settings['b_extra_home_CW'] = float(srv_settings['b_extra_home_CW'])       # Cube_holder release angle from CW to home positions to release tension
+            srv_settings['b_extra_home_CCW'] = float(srv_settings['b_extra_home_CCW'])     # Cube_holder release angle from CCW to home positions to release tension
+            srv_settings['b_spin_time'] = float(srv_settings['b_spin_time'])               # time for Cube_holder to spin 90 deg (cune not contrained)
+            srv_settings['b_rotate_time'] = float(srv_settings['b_rotate_time'])           # time for Cube_holder to rotate 90 deg (cube constrained)
+            srv_settings['b_rel_time'] = float(srv_settings['b_rel_time'])                 # time for Cube_holder to release tension at home, CCW and CW positions
             
-            return(settings)
+            return srv_settings
             
         except:   # exception will be raised if json keys differs, or parameters cannot be converted to float
-            print('error on converting to proper format the imported parameters')   # feedback is printed to the terminal                                  
-            return settings                                        # return (empty) settings
+            print('error on converting to proper format the servos imported parameters')   # feedback is printed to the terminal                                  
+            return {}                                              # return (empty) settings
     
     else:                                                          # case the servo_settings file does not exists, or name differs
         print('could not find Cubotino_m_servo_settings.txt')      # feedback is printed to the terminal                                  
-        return settings                                            # return settingsf
+        return srv_settings                                        # return settings
 
 
 
 
 
-
-
-
-def upload_settings(settings):
+def upload_servo_settings(srv_settings):
     """ Function to assign the servo settings from the dictionary to individual global variables.""" 
     
     global t_min_pulse_width, t_max_pulse_width, t_servo_close, t_servo_open
@@ -121,82 +179,77 @@ def upload_settings(settings):
     global b_rel_CCW, b_rel_CW, b_extra_home_CW, b_extra_home_CCW
     global b_spin_time, b_rotate_time, b_rel_time
 
-    t_min_pulse_width = robot_settings['t_min_pulse_width']        # defines the min Pulse With the top servo reacts to
-    t_max_pulse_width = robot_settings['t_max_pulse_width']        # defines the max Pulse With the top servo reacts to
-    t_servo_close = robot_settings['t_servo_close']                # Top_cover close position, in gpiozero format
-    t_servo_open = robot_settings['t_servo_open']                  # Top_cover open position, in gpiozero format
-    t_servo_read = robot_settings['t_servo_read']                  # Top_cover camera read position, in gpiozero format
-    t_servo_flip = robot_settings['t_servo_flip']                  # Top_cover flip position, in gpiozero format
-    t_servo_rel_delta = robot_settings['t_servo_rel_delta']        # Top_cover release angle movement from the close position to release tension
-    t_flip_to_close_time = robot_settings['t_flip_to_close_time']  # time for Top_cover from flip to close position
-    t_close_to_flip_time = robot_settings['t_close_to_flip_time']  # time for Top_cover from close to flip position 
-    t_flip_open_time = robot_settings['t_flip_open_time']          # time for Top_cover from open to flip position, and viceversa  
-    t_open_close_time = robot_settings['t_open_close_time']        # time for Top_cover from open to close position, and viceversa
-    t_rel_time = robot_settings['t_rel_time']                      # time for Top_cover to release tension from close position
+    t_min_pulse_width = srv_settings['t_min_pulse_width']        # defines the min Pulse With the top servo reacts to
+    t_max_pulse_width = srv_settings['t_max_pulse_width']        # defines the max Pulse With the top servo reacts to
+    t_servo_close = srv_settings['t_servo_close']                # Top_cover close position, in gpiozero format
+    t_servo_open = srv_settings['t_servo_open']                  # Top_cover open position, in gpiozero format
+    t_servo_read = srv_settings['t_servo_read']                  # Top_cover camera read position, in gpiozero format
+    t_servo_flip = srv_settings['t_servo_flip']                  # Top_cover flip position, in gpiozero format
+    t_servo_rel_delta = srv_settings['t_servo_rel_delta']        # Top_cover release angle movement from the close position to release tension
+    t_flip_to_close_time = srv_settings['t_flip_to_close_time']  # time for Top_cover from flip to close position
+    t_close_to_flip_time = srv_settings['t_close_to_flip_time']  # time for Top_cover from close to flip position 
+    t_flip_open_time = srv_settings['t_flip_open_time']          # time for Top_cover from open to flip position, and viceversa  
+    t_open_close_time = srv_settings['t_open_close_time']        # time for Top_cover from open to close position, and viceversa
+    t_rel_time = srv_settings['t_rel_time']                      # time for Top_cover to release tension from close position
 
-    b_min_pulse_width = robot_settings['b_min_pulse_width']        # defines the min Pulse With the bottom servo reacts to
-    b_max_pulse_width = robot_settings['b_max_pulse_width']        # defines the max Pulse With the bottom servo reacts to
-    b_servo_CCW = robot_settings['b_servo_CCW']                    # Cube_holder max CCW angle position
-    b_servo_CW = robot_settings['b_servo_CW']                      # Cube_holder max CW angle position
-    b_home = robot_settings['b_home']                              # Cube_holder home angle position
-    b_rel_CCW = robot_settings['b_rel_CCW']                        # Cube_holder release angle from CCW angle positions, to release tension
-    b_rel_CW = robot_settings['b_rel_CW']                          # Cube_holder release angle from CW angle positions, to release tension
-    b_extra_home_CW = robot_settings['b_extra_home_CW']            # Cube_holder release angle from home angle positions, to release tension
-    b_extra_home_CCW = robot_settings['b_extra_home_CCW']          # Cube_holder release angle from home angle positions, to release tension
-    b_spin_time = robot_settings['b_spin_time']                    # time for Cube_holder to spin 90 deg (cune not contrained)
-    b_rotate_time = robot_settings['b_rotate_time']                # time for Cube_holder to rotate 90 deg (cube constrained)
-    b_rel_time = robot_settings['b_rel_time']                      # time for Cube_holder to release tension at home, CCW and CW positions
-
-
+    b_min_pulse_width = srv_settings['b_min_pulse_width']        # defines the min Pulse With the bottom servo reacts to
+    b_max_pulse_width = srv_settings['b_max_pulse_width']        # defines the max Pulse With the bottom servo reacts to
+    b_servo_CCW = srv_settings['b_servo_CCW']                    # Cube_holder max CCW angle position
+    b_servo_CW = srv_settings['b_servo_CW']                      # Cube_holder max CW angle position
+    b_home = srv_settings['b_home']                              # Cube_holder home angle position
+    b_rel_CCW = srv_settings['b_rel_CCW']                        # Cube_holder release angle from CCW angle positions, to release tension
+    b_rel_CW = srv_settings['b_rel_CW']                          # Cube_holder release angle from CW angle positions, to release tension
+    b_extra_home_CW = srv_settings['b_extra_home_CW']            # Cube_holder release angle from home angle positions, to release tension
+    b_extra_home_CCW = srv_settings['b_extra_home_CCW']          # Cube_holder release angle from home angle positions, to release tension
+    b_spin_time = srv_settings['b_spin_time']                    # time for Cube_holder to spin 90 deg (cune not contrained)
+    b_rotate_time = srv_settings['b_rotate_time']                # time for Cube_holder to rotate 90 deg (cube constrained)
+    b_rel_time = srv_settings['b_rel_time']                      # time for Cube_holder to release tension at home, CCW and CW positions
 
 
 
 
 
-def update_settings_dict():
+def update_servo_settings_dict():
     """ Function to update the servo settings dictionary based on the global variables.""" 
     
-    robot_settings['t_min_pulse_width'] = t_min_pulse_width        # defines the min Pulse With the top servo reacts to
-    robot_settings['t_max_pulse_width'] = t_max_pulse_width        # defines the max Pulse With the top servo reacts to
-    robot_settings['t_servo_close'] = t_servo_close                # Top_cover close position, in gpiozero format
-    robot_settings['t_servo_open'] = t_servo_open                  # Top_cover open position, in gpiozero format
-    robot_settings['t_servo_read'] = t_servo_read                  # Top_cover camera read position, in gpiozero format
-    robot_settings['t_servo_flip'] = t_servo_flip                  # Top_cover flip position, in gpiozero format
-    robot_settings['t_servo_rel_delta'] = t_servo_rel_delta        # Top_cover release angle movement from the close position to release tension
-    robot_settings['t_flip_to_close_time'] = t_flip_to_close_time  # time for Top_cover from flip to close position
-    robot_settings['t_close_to_flip_time'] = t_close_to_flip_time  # time for Top_cover from close to flip position 
-    robot_settings['t_flip_open_time'] = t_flip_open_time          # time for Top_cover from open to flip position, and viceversa  
-    robot_settings['t_open_close_time'] = t_open_close_time        # time for Top_cover from open to close position, and viceversa
-    robot_settings['t_rel_time'] = t_rel_time                      # time for Top_cover to release tension from close to close position
+    srv_settings['t_min_pulse_width'] = t_min_pulse_width        # defines the min Pulse With the top servo reacts to
+    srv_settings['t_max_pulse_width'] = t_max_pulse_width        # defines the max Pulse With the top servo reacts to
+    srv_settings['t_servo_close'] = t_servo_close                # Top_cover close position, in gpiozero format
+    srv_settings['t_servo_open'] = t_servo_open                  # Top_cover open position, in gpiozero format
+    srv_settings['t_servo_read'] = t_servo_read                  # Top_cover camera read position, in gpiozero format
+    srv_settings['t_servo_flip'] = t_servo_flip                  # Top_cover flip position, in gpiozero format
+    srv_settings['t_servo_rel_delta'] = t_servo_rel_delta        # Top_cover release angle movement from the close position to release tension
+    srv_settings['t_flip_to_close_time'] = t_flip_to_close_time  # time for Top_cover from flip to close position
+    srv_settings['t_close_to_flip_time'] = t_close_to_flip_time  # time for Top_cover from close to flip position 
+    srv_settings['t_flip_open_time'] = t_flip_open_time          # time for Top_cover from open to flip position, and viceversa  
+    srv_settings['t_open_close_time'] = t_open_close_time        # time for Top_cover from open to close position, and viceversa
+    srv_settings['t_rel_time'] = t_rel_time                      # time for Top_cover to release tension from close to close position
     
-    robot_settings['b_min_pulse_width'] = b_min_pulse_width        # defines the min Pulse With the bottom servo reacts to
-    robot_settings['b_max_pulse_width'] = b_max_pulse_width        # defines the max Pulse With the bottom servo reacts to
-    robot_settings['b_servo_CCW'] = b_servo_CCW                    # Cube_holder max CCW angle position
-    robot_settings['b_servo_CW'] = b_servo_CW                      # Cube_holder max CW angle position
-    robot_settings['b_home'] = b_home                              # Cube_holder home angle position
-    robot_settings['b_rel_CCW'] = b_rel_CCW                        # Cube_holder release angle from CCW angle positions, to release tension
-    robot_settings['b_rel_CW'] = b_rel_CW                          # Cube_holder release angle from CW angle positions, to release tension
-    robot_settings['b_extra_home_CW'] = b_extra_home_CW            # Cube_holder release angle from home angle positions, to release tension
-    robot_settings['b_extra_home_CCW'] = b_extra_home_CCW          # Cube_holder release angle from home angle positions, to release tension
-    robot_settings['b_spin_time'] = b_spin_time                    # time for Cube_holder to spin 90 deg (cune not contrained)
-    robot_settings['b_rotate_time'] = b_rotate_time                # time for Cube_holder to rotate 90 deg (cube constrained)
-    robot_settings['b_rel_time'] = b_rel_time                      # time for Cube_holder to release tension at home, CCW and CW positions
+    srv_settings['b_min_pulse_width'] = b_min_pulse_width        # defines the min Pulse With the bottom servo reacts to
+    srv_settings['b_max_pulse_width'] = b_max_pulse_width        # defines the max Pulse With the bottom servo reacts to
+    srv_settings['b_servo_CCW'] = b_servo_CCW                    # Cube_holder max CCW angle position
+    srv_settings['b_servo_CW'] = b_servo_CW                      # Cube_holder max CW angle position
+    srv_settings['b_home'] = b_home                              # Cube_holder home angle position
+    srv_settings['b_rel_CCW'] = b_rel_CCW                        # Cube_holder release angle from CCW angle positions, to release tension
+    srv_settings['b_rel_CW'] = b_rel_CW                          # Cube_holder release angle from CW angle positions, to release tension
+    srv_settings['b_extra_home_CW'] = b_extra_home_CW            # Cube_holder release angle from home angle positions, to release tension
+    srv_settings['b_extra_home_CCW'] = b_extra_home_CCW          # Cube_holder release angle from home angle positions, to release tension
+    srv_settings['b_spin_time'] = b_spin_time                    # time for Cube_holder to spin 90 deg (cune not contrained)
+    srv_settings['b_rotate_time'] = b_rotate_time                # time for Cube_holder to rotate 90 deg (cube constrained)
+    srv_settings['b_rel_time'] = b_rel_time                      # time for Cube_holder to release tension at home, CCW and CW positions
     
-    return robot_settings
+    return srv_settings
 
 
 
 
 
-
-def load_previous_settings():
-    """ Function load the servo settings from latest json backup file saved.""" 
-    
-    global robot_settings
+def load_previous_servo_settings():
+    """ Function load the servo settings from latest json backup file saved."""
     
     folder = pathlib.Path().resolve()                          # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                # mac address is retrieved
-    if eth_mac == AF_mac:                                      # case the script is running on AF (Andrea Favero) robot
+    if eth_mac in macs_AF:                                     # case the script is running on AF (Andrea Favero) robot
         fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
     else:                                                      # case the script is not running on AF (Andrea Favero) robot
         fname = os.path.join(folder,'Cubotino_m_servo_settings.txt')   # folder and file name for the settings, to be tuned
@@ -209,62 +262,58 @@ def load_previous_settings():
                 os.remove(backup_files[-1])                    # the oldes backup file is deleted
                 backup_files = sorted(glob.iglob(backup_fname), key=os.path.getctime, reverse=True) # ordered list of backuped settings files     
         latest_backup = backup_files[0]                        # latest settings files backed up
-        robot_settings = read_settings_file(latest_backup)     # settings are read from the latest_backup file
-        print(f"Uploaded settings from latest_backup:  {latest_backup}")  # feedback is printed to the terminal
+        srv_settings = read_servo_settings_file(latest_backup) # settings are read from the latest_backup file
+        print(f"\nUploaded settings from latest_backup:  {latest_backup}")  # feedback is printed to the terminal
     else:                                                      # case there are backup setting files
-        robot_settings = read_settings_file(fname)             # settings are read from the fname file
-        print(f"Not found backup files, uploaded settings from file: {fname}")
+        srv_settings = read_servo_settings_file(fname)         # settings are read from the fname file
+        print(f"\nNot found backup files, uploaded settings from file: {fname}")
     
-    upload_settings(robot_settings)                            # settings are uploaded (to global variables)
-    update_sliders()                                           # sliders are updated
-    
-    
-    
-    
-    
-    
-def save_new_settings():
+    upload_servo_settings(srv_settings)                        # settings are uploaded (to global variables)
+    update_servo_sliders()                                     # sliders are updated
+
+
+
+
+
+def save_new_servo_settings():
     """ Function to write the servo settings dictionary to json file.
         Before overwriting the file, a backup copy is made.""" 
-    global robot_settings
     
-    folder = pathlib.Path().resolve()                              # active folder (should be home/pi/cube)  
-    eth_mac = get_mac_address()                                    # mac address is retrieved
-    if eth_mac == AF_mac:                                          # case the script is running on AF (Andrea Favero) robot
+    global srv_settings
+    
+    folder = pathlib.Path().resolve()                          # active folder (should be home/pi/cube)  
+    eth_mac = get_mac_address()                                # mac address is retrieved
+    if eth_mac in macs_AF:                                     # case the script is running on AF (Andrea Favero) robot
         fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
-    else:                                                          # case the script is not running on AF (Andrea Favero) robot
+    else:                                                      # case the script is not running on AF (Andrea Favero) robot
         fname = os.path.join(folder,'Cubotino_m_servo_settings.txt') # folder and file name for the settings, to be tuned
     
-    if os.path.exists(fname):                                      # case the servo_settings file exists
-        
-        datetime = dt.datetime.now().strftime('%Y%m%d_%H%M%S')     # date_time variable is assigned, for file name
+    if os.path.exists(fname):                                  # case the servo_settings file exists    
+        datetime = dt.datetime.now().strftime('%Y%m%d_%H%M%S') # date_time variable is assigned, for file name
         backup_fname = fname[:-4] + '_backup_' + datetime + '.txt' # backup file name
-        with open(backup_fname, "w") as f:                         # original servo_settings are saved to a backup file with datetime ref
-            f.write(json.dumps(robot_settings, indent=0))          # content of the setting file is saved
+        with open(backup_fname, "w") as f:                     # original servo_settings are saved to a backup file with datetime ref
+            f.write(json.dumps(srv_settings, indent=0))        # content of the setting file is saved
             print("\nsaving previous settings to backup file:", backup_fname)
         
-        backup_fname = fname[:-4] + '_backup*.txt'                 # common name prefix for the backup files
+        backup_fname = fname[:-4] + '_backup*.txt'             # common name prefix for the backup files
         backup_files = sorted(glob.iglob(backup_fname), key=os.path.getmtime, reverse=True) # ordered list of backuped settings files 
-        if len(backup_files) > 10:                                 # case there are more than 10 backup files
-            while len(backup_files) > 10:                          # iteration until there will only be 10 backup files
-                os.remove(backup_files[-1])                        # the oldes backup file is deleted
+        if len(backup_files) > 10:                             # case there are more than 10 backup files
+            while len(backup_files) > 10:                      # iteration until there will only be 10 backup files
+                os.remove(backup_files[-1])                    # the oldes backup file is deleted
                 backup_files = sorted(glob.iglob(backup_fname), key=os.path.getctime, reverse=True) # ordered list of backuped settings files 
         
-        robot_settings = update_settings_dict()                    # settings updated to sliders values
-        with open(fname, "w") as f:                                # servo_settings file is opened in reading mode
-            f.write(json.dumps(robot_settings, indent=0))          # content of the setting file is saved
-            print("saving settings to:", fname)                    # feedback is printed to the terminal
-    else:                                                          # case the servo_settings file exists
-        print("fname does not exists at save_new_settings function")
+        srv_settings = update_servo_settings_dict()            # settings updated to sliders values
+        with open(fname, "w") as f:                            # servo_settings file is opened in reading mode
+            f.write(json.dumps(srv_settings, indent=0))        # content of the setting file is saved
+            print("saving settings to:", fname)                # feedback is printed to the terminal
+    else:                                                      # case the servo_settings file exists
+        print("fname does not exists at save_new_servo_settings function")
 
 
 
 
 
-
-
-
-def update_sliders():
+def update_servo_sliders():
     """function to update the sliders according to the (global) variable."""
     
     # t_min_pulse_width
@@ -292,6 +341,179 @@ def update_sliders():
     s_btn_srv_spin_time.set(b_spin_time)
     s_btn_srv_rotate_time.set(b_rotate_time)
     s_btn_srv_rel_time.set(b_rel_time)
+
+
+
+
+
+def last_btn_srv_pos():
+    """keep track of the last bottom servo position."""
+    global b_servo_pos
+    
+    if b_servo_pos == 'CCW':
+        return b_servo_CCW
+    elif b_servo_pos == 'CW':
+        return b_servo_CW
+    else:
+        return b_home
+######################################################################################################################
+
+
+
+
+
+# #################### functions to manage camera settings from/to files   ###########################################
+def read_cam_settings_file(fname=''):
+    """ Function to assign the cam settings to a dictionary, after testing their data type."""   
+    
+    import os.path, pathlib, json                              # libraries needed for the json, and parameter import
+    # convenient choice for Andrea Favero, to upload the settings fitting his robot based on mac address check                
+    from getmac import get_mac_address                         # library to get the device MAC ddress
+    
+    if len(fname) == 0:                                        # case fname equals empty string
+        folder = pathlib.Path().resolve()                      # active folder (should be home/pi/cube)  
+        eth_mac = get_mac_address()                            # mac address is retrieved
+        if eth_mac in macs_AF:                                 # case the script is running on AF (Andrea Favero) robot
+            fname = os.path.join(folder,'Cubotino_m_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+        else:                                                  # case the script is not running on AF (Andrea Favero) robot
+            fname = os.path.join(folder,'Cubotino_m_settings.txt')   # folder and file name for the settings, to be tuned
+    
+#     cam_settings = {}
+    if os.path.exists(fname):                                  # case the settings file exists
+        with open(fname, "r") as f:                            # settings file is opened in reading mode
+            cam_settings = json.load(f)                        # json file is parsed to a local dict variable
+        
+        try:           
+            # from the dict obtained via json.load the settings dict adds individual data type check
+            cam_settings['x_l'] = int(cam_settings['x_l'])         # pixels to remove at the left image side
+            cam_settings['x_r'] = int(cam_settings['x_r'])         # pixels to remove at the right image side
+            cam_settings['y_u'] = int(cam_settings['y_u'])         # pixels to remove at the upper image side
+            cam_settings['y_b'] = int(cam_settings['y_b'])         # pixels to remove at the bottom image side
+            cam_settings['warp_fraction'] = float(cam_settings['warp_fraction'])  # warp correction factor
+            cam_settings['warp_slicing'] = float(cam_settings['warp_slicing'])    # image slicing after warping
+            return cam_settings
+            
+        except:   # exception will be raised if json keys differs, or parameters cannot be converted to float
+            print('error on converting to proper format the cam imported parameters')   # feedback is printed to the terminal                                  
+            return {}                                    # return (empty) settings
+    
+    else:                                                # case the cam_settings file does not exists, or name differs
+        print('could not find Cubotino_m_settings.txt')  # feedback is printed to the terminal                                  
+        return cam_settings                              # return settings
+
+
+
+
+def upload_cam_settings(cam_settings):
+    """ Function to assign the cam settings from the dictionary to individual global variables.""" 
+    
+    global x_l, x_r, y_u, y_b, warp_fraction, warp_slicing
+
+    x_l = cam_settings['x_l']                            # pixels to remove at the left image side
+    x_r = cam_settings['x_r']                            # pixels to remove at the right image side
+    y_u = cam_settings['y_u']                            # pixels to remove at the upper image side
+    y_b = cam_settings['y_b']                            # pixels to remove at the bottom image side
+    warp_fraction = cam_settings['warp_fraction']        # image warping factor
+    warp_slicing = cam_settings['warp_slicing']          # image slicing after warping
+
+
+
+
+def load_previous_cam_settings():
+    """ Function load the cam settings from latest json backup file saved.""" 
+    
+    folder = pathlib.Path().resolve()                          # active folder (should be home/pi/cube)  
+    eth_mac = get_mac_address()                                # mac address is retrieved
+    if eth_mac in macs_AF:                                     # case the script is running on AF (Andrea Favero) robot
+        fname = os.path.join(folder,'Cubotino_m_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+    else:                                                      # case the script is not running on AF (Andrea Favero) robot
+        fname = os.path.join(folder,'Cubotino_m_settings.txt') # folder and file name for the settings, to be tuned
+    
+    backup_fname = fname[:-4] + '_backup*.txt'
+    backup_files = sorted(glob.iglob(backup_fname), key=os.path.getmtime, reverse=True) # ordered list of backuped settings files 
+    if len(backup_files) > 0:                                  # case there are backup setting files
+        if len(backup_files) > 10:                             # case there are more than 10 backup files
+            while len(backup_files) > 10:                      # iteration until there will only be 10 backup files
+                os.remove(backup_files[-1])                    # the oldes backup file is deleted
+                backup_files = sorted(glob.iglob(backup_fname), key=os.path.getctime, reverse=True) # ordered list of backuped settings files     
+        latest_backup = backup_files[0]                        # latest settings files backed up
+        cam_settings = read_cam_settings_file(latest_backup)   # settings are read from the latest_backup file
+        print(f"\nUploaded cam settings from latest_backup:  {latest_backup}")  # feedback is printed to the terminal
+    else:                                                      # case there are backup setting files
+        cam_settings = read_cam_settings_file(fname)           # settings are read from the fname file
+        print(f"\nNot found backup files, uploaded settings from file: {fname}")
+    
+    upload_cam_settings(cam_settings)                          # cam settings are uploaded (to global variables)
+    update_cam_sliders()                                       # cam sliders are updated
+
+
+
+
+
+def update_cam_settings_dict():
+    """ Function to update the cam settings dictionary based on the global variables.""" 
+    
+    cam_settings['x_l'] = x_l                            # pixels to remove at the left image side
+    cam_settings['x_r'] = x_r                            # pixels to remove at the right image side
+    cam_settings['y_u'] = y_u                            # pixels to remove at the upper image side
+    cam_settings['y_b'] = y_b                            # pixels to remove at the bottom image side
+    cam_settings['warp_fraction'] = warp_fraction        # image warping factor
+    cam_settings['warp_slicing'] = warp_slicing          # image slicing after warping
+    
+    return cam_settings
+
+
+
+
+
+def save_new_cam_settings():
+    """ Function to write the cam settings dictionary to json file.
+        Before overwriting the file, a backup copy is made.""" 
+    
+    global cam_settings
+    
+    folder = pathlib.Path().resolve()                              # active folder (should be home/pi/cube)  
+    eth_mac = get_mac_address()                                    # mac address is retrieved
+    if eth_mac in macs_AF:                                         # case the script is running on AF (Andrea Favero) robot
+        fname = os.path.join(folder,'Cubotino_m_settings_AF.txt')  # AF robot settings (optimized settings for AF bot)
+    else:                                                          # case the script is not running on AF (Andrea Favero) robot
+        fname = os.path.join(folder,'Cubotino_m_settings.txt')     # folder and file name for the settings, to be tuned
+    
+    if os.path.exists(fname):                                      # case the servo_settings file exists
+        
+        datetime = dt.datetime.now().strftime('%Y%m%d_%H%M%S')     # date_time variable is assigned, for file name
+        backup_fname = fname[:-4] + '_backup_' + datetime + '.txt' # backup file name
+        with open(backup_fname, "w") as f:                         # original servo_settings are saved to a backup file with datetime ref
+            f.write(json.dumps(cam_settings, indent=0))            # content of the setting file is saved
+            print("\nsaving previous settings to backup file:", backup_fname)
+        
+        backup_fname = fname[:-4] + '_backup*.txt'                 # common name prefix for the backup files
+        backup_files = sorted(glob.iglob(backup_fname), key=os.path.getmtime, reverse=True) # ordered list of backuped settings files 
+        if len(backup_files) > 10:                                 # case there are more than 10 backup files
+            while len(backup_files) > 10:                          # iteration until there will only be 10 backup files
+                os.remove(backup_files[-1])                        # the oldes backup file is deleted
+                backup_files = sorted(glob.iglob(backup_fname), key=os.path.getctime, reverse=True) # ordered list of backuped settings files 
+        
+        cam_settings = update_cam_settings_dict()                  # settings updated to sliders values
+        with open(fname, "w") as f:                                # robot setting file is opened in reading mode
+            f.write(json.dumps(cam_settings, indent=0))            # content of the setting file is saved
+            print("saving settings to:", fname)                    # feedback is printed to the terminal
+    else:                                                          # case the servo_settings file exists
+        print("fname does not exists at save_new_cam_settings function")
+
+
+
+
+
+def update_cam_sliders():
+    """function to update the cam sliders according to the (global) variable."""
+    
+    s_crop_l.set(x_l)
+    s_crop_r.set(x_r)
+    s_crop_u.set(y_u)
+    s_crop_b.set(y_b)
+    s_warp_f.set(warp_fraction)
+    s_warp_s.set(warp_slicing)
 
 ######################################################################################################################
 
@@ -374,17 +596,6 @@ def flip_open_time(val):
 def open_close_time(val):
     global t_open_close_time
     t_open_close_time = round(float(s_top_srv_open_close_time.get()),3)  # time to raise/lower the flipper between open and close positions
-
-
-def last_btn_srv_pos():
-    global b_servo_pos
-    
-    if b_servo_pos == 'CCW':
-        return b_servo_CCW
-    elif b_servo_pos == 'CW':
-        return b_servo_CW
-    else:
-        return b_home
     
     
 def btn_srv_min_pulse(val):
@@ -475,17 +686,58 @@ def servo_rotate_time(val):
     global b_rotate_time
     b_rotate_time = round(float(s_btn_srv_rotate_time.get()),3)  # time needed to the bottom servo to rotate about 90deg
 
+
 def servo_rel_time(val):
     global b_rel_time
     b_rel_time = round(float(s_btn_srv_rel_time.get()),3)    # time to rotate slightly back, to release tensions
+
 
 def servo_spin_time(val):
     global b_spin_time
     b_spin_time = round(float(s_btn_srv_spin_time.get()),3)  # time needed to the bottom servo to spin about 90deg
 
+
+def crop_u(val):
+    global y_u
+    y_u = int(s_crop_u.get())                  # pixels to crop on upper image side
+    disp.show_on_display('CROP UPPER', str(y_u), fs1=27, y2=75, fs2=30)  # feedback is printed to the display
+    take_image(widgets_freeze=False)           # camera reads one frame
+
+
+def crop_l(val):
+    global x_l
+    x_l = int(s_crop_l.get())                  # pixels to crop on left image side
+    disp.show_on_display('CROP LEFT', str(x_l), fs1=28, y2=75, fs2=30)  # feedback is printed to the display
+    take_image(widgets_freeze=False)           # camera reads one frame
+
+
+def crop_r(val):
+    global x_r
+    x_r = int(s_crop_r.get())                  # pixels to crop on right image side
+    disp.show_on_display('CROP RIGHT', str(x_r), fs1=28, y2=75, fs2=30)  # feedback is printed to the display
+    take_image(widgets_freeze=False)           # camera reads one frame
+
+
+def crop_b(val):
+    global y_b
+    y_b = int(s_crop_b.get())                  # pixels to crop on bottom image side
+    disp.show_on_display('CROP BOTTOM', str(y_b), fs1=26, y2=75, fs2=30)  # feedback is printed to the display
+    take_image(widgets_freeze=False)           # camera reads one frame
+
+
+def warp_f_get(val):
+    global warp_fraction
+    warp_fraction = float(round(s_warp_f.get(),2))        # warping fraction
+    disp.show_on_display('WARP FRACTION', str(warp_fraction), fs1=24, y2=75, fs2=30)  # feedback is printed to the display
+    take_image(widgets_freeze=False)           # camera reads one frame
+
+
+def warp_s_get(val):
+    global warp_slicing
+    warp_slicing = int(s_warp_s.get())         # Warping slincing
+    disp.show_on_display('WARP SLICING', str(warp_slicing), fs1=26, y2=75, fs2=30)  # feedback is printed to the display
+    take_image(widgets_freeze=False)           # camera reads one frame
 ######################################################################################################################
-
-
 
 
 
@@ -523,7 +775,6 @@ def open_top_cover():
         btm_srv_widgets_status()                  # updates the bottom servo related widgests status, based on top servo pos
         
 
-
 def read_position():
     global t_servo_read, t_servo_pos
     servo.stop_release()                          # servos are made activate in case aren't
@@ -547,7 +798,7 @@ def flip_cube():
 
 def ccw():
     global b_servo_pos
-    servo.stop_release()                                     # servos are made activate in case aren't
+    servo.stop_release()                          # servos are made activate in case aren't
     
     if t_servo_pos == 'open':
         timer1 = b_spin_time
@@ -608,6 +859,7 @@ def cw():
                 timer1+=timer1
             b_servo_pos = servo.spin_out('CW', b_servo_CW, b_rel_CW, timer1, test=True) # send the spin/rotate to CW request to the robot
             disp.show_on_display('b_srv CCW', f'{b_servo_CW} ({round(b_servo_CW-b_rel_CW,3)})', fs1=30, y2=75, fs2=30)  # feedback is printed to the display
+            print("b_servo_CW, b_rel_CW, timer1:", b_servo_CW, b_rel_CW, timer1)
 
 
 def test():
@@ -650,9 +902,7 @@ def btm_srv_widgets_status():
         home_btn["state"] = "normal"            # button is set back normal
         cw_btn["relief"] = "raised"             # button is set back raised
         cw_btn["state"] = "normal"              # button is set back normal
-        
         enable_widgets(btn_srv_label, relief="raised")
-    
     
     else:                                       # case the lifter is not blocking the holder rotation
         ccw_btn["relief"] = "sunken"            # button is set sunken
@@ -661,22 +911,68 @@ def btm_srv_widgets_status():
         home_btn["state"] = "disabled"          # button is set disabled
         cw_btn["relief"] = "sunken"             # button is set sunken
         cw_btn["state"] = "disabled"            # button is set disabled
-        
         disable_widgets(btn_srv_label, relief="sunken")
+######################################################################################################################
+
+
+
+
+
+# #################### functions to manage the GUI windows ###########################################################
+def goto_camWindow():
+    """function to bring the cam settings Window on top."""
+    show_window(camWindow)
+
+
+def goto_servoWindow():
+    """function to bring the servo settings Window on top."""
+    show_window(servoWindow)
 
 
 def disable_widgets(parent, relief):
-    for child in parent.winfo_children():       # iteration through children widgets in parent
-            child["relief"] = relief            # slider is set sunken
-            child["state"] = "disabled"         # slider is set disabled
+    for child in parent.winfo_children():      # iteration through children widgets in parent
+            child["relief"] = relief           # slider is set sunken
+            child["state"] = "disabled"        # slider is set disabled
+
 
 def enable_widgets(parent, relief):
-    for child in parent.winfo_children():       # iteration through children widgets in parent
-            child["relief"] = relief            # slider is set flat
-            child["state"] = "normal"           # slider is set normal
-    
+    for child in parent.winfo_children():      # iteration through children widgets in parent
+            child["relief"] = relief           # slider is set flat
+            child["state"] = "normal"          # slider is set normal
+
+
+def show_window(window, startup=False):
+    """Function to bring to the front the window in argument."""
+    global servoWindow_ontop
+    if window==servoWindow:                    # case the request is to show the servo settings windows
+        window.tkraise()                       # servo settings windows is raised on top
+        servoWindow_ontop=True                 # boolean of servo settings windows being on top is set true
+        root.geometry('+0+40')                 # windows is presented at top-left of the screen
+        if not startup:                        # case the servoWindow is called after the camWindow
+            root.resizable(1,1)                # root windows is set as resizable
+            root.geometry(f'{srv_w_w}x{srv_w_h}')   # servo windows size set to the dimensions initially calculated
+            cv2.destroyAllWindows()            # all open windows are closed
+        disp.show_on_display('SERVOS', 'TUNING', fs1=38, y2=75, fs2=38)  # feedback is printed to the display
+        disp.set_backlight(1)                  # display backlight is turned on, in case it wasn't
+        return                                 # function in closed
+
+    elif window==camWindow:                    # case the request is to show the cam setting windows
+        read_position()                        # top_cover positioned to read position
+        window.tkraise()                       # picamera setting windows is raised on top
+        servoWindow_ontop=False                # boolean of servo settings windows being on top is set false
+        w = 1100                               # window width
+        h = 650                                # windows height
+        root.resizable(1,1)                    # root windows is set to be resizable on x and y
+        root.geometry(f'{w}x{h}+{int(ws-w)}+40') # windows is initially presented at top-right of the screen
+        root.update()                          # forced a windows updated prior a long process
+        update_cam_sliders()                   # updates the sliders to the variable values from settings
+        root.update()                          # forced a windows updated prior a long process
+        disp.show_on_display('CAMERA', 'TUNING', fs1=38, y2=75, fs2=38)  # feedback is printed to the display
+        disp.set_backlight(1)                  # display backlight is turned on, in case it wasn't
+        take_image(refresh=10)                 # camera takes one frame and displayes it
 ######################################################################################################################
-    
+
+
 
 
 
@@ -686,24 +982,42 @@ def enable_widgets(parent, relief):
 # ############################### Starting variables  ################################################################
 # ####################################################################################################################
 
-AF_mac = 'e4:5f:01:8d:59:97'                 # mac address of Andrea Favero Cubotino_micro (optimized servos setting for my bot)
-disp.show_on_display('SERVOS', 'TUNING', fs1=38, y2=75, fs2=38)  # feedback is printed to the display
-disp.set_backlight(1)                        # display backlight is turned on, in case it wasn't
-printout = False                             # boolean to print the settings at script startingstart
-robot_settings  = read_settings_file()       # servos settings are retrieved from the json settings files
-upload_settings(robot_settings)              # servos settings are loaded to global
-servo_init()                                 # servos are initialez
+printout = False                             # boolean to print the settings to the terminal at script starting
+servoWindow_ontop=True                       # boolean to track which window is on top
+picamera_initialized = False                 # boolean to track if the camera has been initialized
+startup = True                               # boolean to track the first time window generation
+
+srv_settings  = read_servo_settings_file()   # servos settings are retrieved from the json settings files
+upload_servo_settings(srv_settings)          # servos settings are loaded to global
+servo_init()                                 # servos are initialized
+
+cam_settings  = read_cam_settings_file()     # cam settings are retrieved from the json settings files
+upload_cam_settings(cam_settings)            # cam settings are loaded to global
+
 
 
 
 
 
 # ####################################################################################################################
-# ############################### GUI high level part ################################################################
+# ############################### GUI High level part ################################################################
 # ####################################################################################################################
 root = tk.Tk()                            # initialize tkinter as root 
 root.title("CUBOTino servos setting")     # name is assigned to GUI root
-root.geometry('+0+0')                     # windows is initially presented at top-left of the screen
+root.geometry('+0+40')                    # windows is initially presented at top-left of the screen
+
+
+root.rowconfigure(0, weight=1)            # root is set to have 1 row of  weight=1
+root.columnconfigure(0,weight=1)          # root is set to have 1 column of weight=1
+root.resizable(1,1)
+
+# two windows
+servoWindow=tk.Frame(root)                # a first windows (called servoWindow) is derived from root
+camWindow=tk.Frame(root)                  # a second windows (called camWindow) is derived from root
+for window in (servoWindow, camWindow):   # iteration over the two defined windows
+    window.grid(row=0,column=0,sticky='nsew')  # each window goes to the only row/column, and centered
+
+show_window(servoWindow, startup)         # the first window (mainWindow) is the one that will initially appear
 ######################################################################################################################
 
 
@@ -711,13 +1025,13 @@ root.geometry('+0+0')                     # windows is initially presented at to
 
 
 # ####################################################################################################################
-# ############################### GUI Low level part ################################################################£
+# ############################### GUI Low level part #################################################################
 # ####################################################################################################################
 
 
 #### top servo related widgets ####
-top_srv_label = tk.LabelFrame(root, text="Top cover - servo settings", labelanchor="nw", font=("Arial", "14"))
-top_srv_label.grid(row=0, column=0, rowspan=1, columnspan=3, sticky="n", padx=20, pady=30)
+top_srv_label = tk.LabelFrame(servoWindow, text="Top cover - servo settings", labelanchor="nw", font=("Arial", "14"))
+top_srv_label.grid(row=0, column=0, rowspan=1, columnspan=4, sticky="n", padx=20, pady=30)
 
 
 s_top_srv_close = tk.Scale(top_srv_label, label="CLOSE", font=('arial','14'), orient='horizontal',
@@ -797,9 +1111,9 @@ s_top_srv_open_close_time.set(t_open_close_time)
 
 
 #### bottom servo related widgets ####
-btn_srv_label = tk.LabelFrame(root, text="Cube holder - servo settings",
+btn_srv_label = tk.LabelFrame(servoWindow, text="Cube holder - servo settings",
                                    labelanchor="nw", font=("Arial", "14"))
-btn_srv_label.grid(row=1, column=0, rowspan=1, columnspan=3, sticky="n", padx=20, pady=30)
+btn_srv_label.grid(row=1, column=0, rowspan=1, columnspan=4, sticky="n", padx=20, pady=30)
 
 
 s_btn_srv_min_pulse = tk.Scale(btn_srv_label, label="MIN PULSE WIDTH", font=('arial','14'), orient='horizontal',
@@ -895,7 +1209,7 @@ s_btn_srv_rel_time.set(b_rel_time)
 
 
 #### test settings related widgets ####
-test_label = tk.LabelFrame(root, text="Test (sliders settings)", labelanchor="nw", font=("Arial", "14"))
+test_label = tk.LabelFrame(servoWindow, text="Test (sliders settings)", labelanchor="nw", font=("Arial", "14"))
 test_label.grid(row=2, column=0, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
 
 close_btn = tk.Button(test_label, text="CLOSE", height=1, width=15, state="normal", command= close_top_cover)
@@ -932,16 +1246,16 @@ cw_btn.grid(row=1, column=2, sticky="n", padx=20, pady=10)
 
 
 #### saving settings ####
-files_label = tk.LabelFrame(root, text="Settings files", labelanchor="nw", font=("Arial", "14"))
+files_label = tk.LabelFrame(servoWindow, text="Settings files", labelanchor="nw", font=("Arial", "14"))
 files_label.grid(row=2, column=1, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
 
 
-reset_btn = tk.Button(files_label, text="LOAD PREVIOUS SETTING", height=1, width=30, state="normal", command= load_previous_settings)
+reset_btn = tk.Button(files_label, text="LOAD PREVIOUS SETTING", height=1, width=30, state="normal", command= load_previous_servo_settings)
 reset_btn.configure(font=("Arial", "12"))
 reset_btn.grid(row=0, column=0, sticky="n", padx=20, pady=10)
 
 
-save_btn = tk.Button(files_label, text="SAVE SETTINGS", height=1, width=30, state="normal", command= save_new_settings)
+save_btn = tk.Button(files_label, text="SAVE SETTINGS", height=1, width=30, state="normal", command= save_new_servo_settings)
 save_btn.configure(font=("Arial", "12"))
 save_btn.grid(row=1, column=0, sticky="n", padx=20, pady=10)
 
@@ -949,12 +1263,113 @@ save_btn.grid(row=1, column=0, sticky="n", padx=20, pady=10)
 
 
 #### Large test ####
-large_test_label = tk.LabelFrame(root, text="Full test", labelanchor="nw", font=("Arial", "14"))
+large_test_label = tk.LabelFrame(servoWindow, text="Full test", labelanchor="nw", font=("Arial", "14"))
 large_test_label.grid(row=2, column=2, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
 
-test_btn = tk.Button(large_test_label, text="LONG TEST\n(on saved settings)", height=4, width=22, state="normal", command= test)
+test_btn = tk.Button(large_test_label, text="LONG TEST\n(on saved settings)", height=4, width=18, state="normal", command= test)
 test_btn.configure(font=("Arial", "12"))
 test_btn.grid(row=0, column=0, sticky="w", padx=20, pady=10)
+
+
+
+
+#### change window ####
+to_camera_btn = tk.Button(servoWindow, text="CAMERA\nSETTINGS\nwindow", height=4, width=16, state="normal", command= goto_camWindow)
+to_camera_btn.configure(font=("Arial", "12"))
+to_camera_btn.grid(row=2, column=3, sticky="w", padx=20, pady=10)
+
+
+
+
+
+
+# ####################################################################################################################
+# ###############################     camera window widgets     ######################################################
+# ####################################################################################################################
+
+#### bottom servo related widgets ####
+crop_label = tk.LabelFrame(camWindow, text="Image cropping",
+                                   labelanchor="nw", font=("Arial", "14"))
+crop_label.grid(row=0, column=0, rowspan=1, columnspan=3, sticky="n", padx=20, pady=30)
+
+
+s_crop_u = tk.Scale(crop_label, label="CROP UPPER SIDE", font=('arial','14'), orient='horizontal',
+                          relief='raised', length=320, from_=0, to_=200, resolution=2)
+s_crop_u.grid(row=0, column=1, sticky="w", padx=12, pady=5)
+s_crop_u.set(y_u)
+s_crop_u.bind("<ButtonRelease-1>", crop_u)
+
+
+s_crop_l = tk.Scale(crop_label, label="CROP LEFT SIDE", font=('arial','14'), orient='horizontal',
+                          relief='raised', length=320, from_=0, to_=200, resolution=2)
+s_crop_l.grid(row=1, column=0, sticky="w", padx=12, pady=5)
+s_crop_l.set(x_l)
+s_crop_l.bind("<ButtonRelease-1>", crop_l)
+
+
+s_crop_r = tk.Scale(crop_label, label="CROP RIGHT SIDE", font=('arial','14'), orient='horizontal',
+                          relief='raised', length=320, from_=0, to_=200, resolution=2)
+s_crop_r.grid(row=1, column=2, sticky="w", padx=12, pady=5)
+s_crop_r.set(x_r)
+s_crop_r.bind("<ButtonRelease-1>", crop_r)
+
+
+s_crop_b = tk.Scale(crop_label, label="CROP BOTTOM SIDE", font=('arial','14'), orient='horizontal',
+                          relief='raised', length=320, from_=0, to_=200, resolution=2)
+s_crop_b.grid(row=2, column=1, sticky="w", padx=12, pady=5)
+s_crop_b.set(y_b)
+s_crop_b.bind("<ButtonRelease-1>", crop_b)
+
+
+read_camera_btn = tk.Button(crop_label, text="REFRESH CAMERA", height=1, width=26, state="normal", command= take_image)
+read_camera_btn.configure(font=("Arial", "14"))
+read_camera_btn.grid(row=1, column=1, sticky="nsew", padx=20, pady=10)
+
+
+
+warp_label = tk.LabelFrame(camWindow, text="Image warping",
+                                   labelanchor="nw", font=("Arial", "14"))
+warp_label.grid(row=1, column=0, rowspan=1, columnspan=3, sticky="n", padx=20, pady=30)
+
+
+s_warp_f = tk.Scale(warp_label, label="WARP FRACTION", font=('arial','14'), orient='horizontal',
+                          relief='raised', length=320, from_=20, to_=3, resolution=0.1)
+s_warp_f.grid(row=0, column=0, sticky="w", padx=12, pady=5)
+s_warp_f.set(warp_fraction)
+s_warp_f.bind("<ButtonRelease-1>", warp_f_get)
+
+
+s_warp_s = tk.Scale(warp_label, label="WARP SLICING", font=('arial','14'), orient='horizontal',
+                          relief='raised', length=320, from_=0.1, to_=30, resolution=0.1)
+s_warp_s.grid(row=0, column=1, sticky="w", padx=12, pady=5)
+s_warp_s.set(warp_slicing)
+s_warp_s.bind("<ButtonRelease-1>", warp_s_get)
+
+
+read_camera_btn2 = tk.Button(warp_label, text="REFRESH CAMERA", height=1, width=26, state="normal", command= take_image)
+read_camera_btn2.configure(font=("Arial", "14"))
+read_camera_btn2.grid(row=0, column=2, sticky="nsew", padx=20, pady=10)
+
+
+#### saving settings ####
+cam_files_label = tk.LabelFrame(camWindow, text="Settings files", labelanchor="nw", font=("Arial", "14"))
+cam_files_label.grid(row=2, column=0, rowspan=1, columnspan=1, sticky="w", padx=20, pady=30)
+
+
+reset_btn = tk.Button(cam_files_label, text="LOAD PREVIOUS SETTING", height=1, width=30, state="normal", command= load_previous_cam_settings)
+reset_btn.configure(font=("Arial", "12"))
+reset_btn.grid(row=0, column=0, sticky="w", padx=20, pady=10)
+
+
+save_btn = tk.Button(cam_files_label, text="SAVE SETTINGS", height=1, width=30, state="normal", command= save_new_cam_settings)
+save_btn.configure(font=("Arial", "12"))
+save_btn.grid(row=0, column=1, sticky="w", padx=20, pady=10)
+
+
+#### change window ####
+to_servo_btn = tk.Button(camWindow, text="SERVO\nSETTINGS\nwindow", height=4, width=16, state="normal", command= goto_servoWindow)
+to_servo_btn.configure(font=("Arial", "12"))
+to_servo_btn.grid(row=2, column=2, sticky="e", padx=20, pady=10)
 
 
 
@@ -965,5 +1380,14 @@ test_btn.grid(row=0, column=0, sticky="w", padx=20, pady=10)
 # ####################################################################################################################
 
 btm_srv_widgets_status()                         # bottom servo widgets are updated according to the top servo position
+
+root.update()                                    # forces a graphical update
+srv_w_w = root.winfo_width()                     # retrieves the window width dimension set automatically 
+srv_w_h = root.winfo_height()                    # retrieves the window height dimension set automatically 
+ws = root.winfo_screenwidth()                    # retrieves the width of the screen
+hs = root.winfo_screenheight()                   # retrieves the height of the screen
+
 root.protocol("WM_DELETE_WINDOW", on_closing)    # closing the GUI
 root.mainloop()                                  # tkinter main loop
+
+

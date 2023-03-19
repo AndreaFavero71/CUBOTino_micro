@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero 10 March 2023
+# Andrea Favero 19 March 2023
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino series.
@@ -27,6 +27,10 @@
 #
 #############################################################################################################
 """
+
+
+macs_AF = ('e4:5f:01:8d:59:97', 'b8:27:eb:b5:43:6b')
+
 
 ##################    imports for the display part   ################################
 from Cubotino_m_display import display as s_disp
@@ -105,10 +109,8 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         
         folder = pathlib.Path().resolve()                                # active folder (should be home/pi/cube)  
         eth_mac = get_mac_address()                                      # mac address is retrieved
-        if eth_mac == 'e4:5f:01:8d:59:97':                               # case the script is running on AF (Andrea Favero) robot
+        if eth_mac in macs_AF:                                           # case the script is running on AF (Andrea Favero) robot
             fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (do not use these at the start)
-        elif eth_mac == 'e4:5f:01:8b:5f:e5':                                  # case the script is running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_servo_settings_AF2.txt')  # AF second robot settings (do not use these at the start)
         else:                                                            # case the script is not running on AF (Andrea Favero) robot
             fname = os.path.join(folder,'Cubotino_m_servo_settings.txt') # folder and file name for the settings, to be tuned
          
@@ -189,7 +191,6 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         
             servo_start_pos(start_pos)        # servos are positioned to the start position    
             fun_status=False                  # boolean to track the robot fun status, it is True after solving the cube :-)
-            servo_off()                       # PWM signal at GPIO is stopped
             cam_led_test()                    # makes a very short led test
             cam_led_Off()                     # forces the led off
     
@@ -281,7 +282,7 @@ def quit_func():
 
 
 
-def cam_led_On(value=0.05):
+def cam_led_On(value=0.5):
     """ Sets the top_cover led ON, with brightness in arg. Value ranges from 0 to 0.3"""
     top_cover_led.value = value         # top cover led PWM is set to arg value
 
@@ -362,8 +363,8 @@ def servo_start_pos(start_pos):
 def servo_off():
     """ Function to stop sending the PWM the servos."""
     
-#     t_servo.detach()             # PWM is stopped at the GPIO pin for top servo
-#     b_servo.detach()             # PWM is stopped at the GPIO pin for bottom servo
+    t_servo.detach()             # PWM is stopped at the GPIO pin for top servo
+    b_servo.detach()             # PWM is stopped at the GPIO pin for bottom servo
     return
 
 
@@ -419,7 +420,6 @@ def read():
                 time.sleep(t_flip_open_time)     # time for the servo to reach the flipping position 
             
             t_top_cover='read'                   # cover/lifter position variable set to flip
-            servo_off()                          # PWM signal at GPIO is stopped
             return 'read'                        # position of the top_cover is returned
 
 
@@ -443,7 +443,6 @@ def flip_up():
                 t_servo.value = t_servo_flip     # servo is positioned to flip the cube
                 time.sleep(t_flip_open_time)     # time for the servo to reach the flipping position
             t_top_cover='flip'                   # cover/lifter position variable set to flip
-            servo_off()                          # PWM signal at GPIO is stopped 
 
 
 
@@ -463,7 +462,6 @@ def flip_to_read():
             time.sleep(t_flip_open_time)         # time for the top servo to reach the open top cover position
             t_top_cover='open'                   # variable to track the top cover/lifter position
             b_servo_operable=True                # variable to block/allow bottom servo operation
-            servo_off()                          # PWM signal at GPIO is stopped 
 
 
 
@@ -482,7 +480,6 @@ def flip_to_open():
             time.sleep(t_flip_open_time)         # time for the top servo to reach the open top cover position
             t_top_cover='open'                   # variable to track the top cover/lifter position
             b_servo_operable=True                # variable to block/allow bottom servo operation
-            servo_off()                          # PWM signal at GPIO is stopped 
 
 
 
@@ -517,7 +514,6 @@ def flip_to_close():
                 
             t_top_cover='close'                    # cover/lifter position variable set to close
             b_servo_operable=True                  # variable to block/allow bottom servo operation
-            servo_off()                            # PWM signal at GPIO is stopped 
 
 
 
@@ -539,7 +535,6 @@ def flip():
             time.sleep(t_flip_open_time+0.1)   # time for the top servo to reach the top cover read position
             t_top_cover='read'                 # variable to track the top cover/lifter position
             b_servo_operable=False             # variable to block/allow bottom servo operation
-            servo_off()                        # PWM signal at GPIO is stopped 
 
 
 
@@ -582,7 +577,6 @@ def open_cover(target=0, test=False):
             time.sleep(t_open_close_time)          # time for the servo to reach the open position
             t_top_cover='open'                     # variable to track the top cover/lifter position
             b_servo_operable=True                  # variable to block/allow bottom servo operation
-            servo_off()                            # PWM signal at GPIO is stopped
             return 'open'                          # position of the top_cover is returned
 
 
@@ -617,7 +611,6 @@ def close_cover(target=0, release=0, timer1=0, timer2=0, test=False):
             
             t_top_cover='close'                    # cover/lifter position variable set to close
             b_servo_operable=True                  # variable to block/allow bottom servo operation
-            servo_off()                            # PWM signal at GPIO is stopped
             return 'close'                         # position of the top_cover is returned
 
 
@@ -668,7 +661,6 @@ def spin_out(direction, target=0, release=0, timer1=0, test=False):
                 b_servo_stopped=True                 # boolean of bottom servo at location the lifter can be operated
                 b_servo_home=False                   # boolean of bottom servo at home
                 b_servo_stopped=True                 # boolean of bottom servo at location the lifter can be operated
-                servo_off()                          # PWM signal at GPIO is stopped
                 return direction                     # position of the holder is returned
 
 
@@ -699,7 +691,6 @@ def spin_home():
                 b_servo_home=True               # boolean of bottom servo at home
                 b_servo_CW_pos=False            # boolean of bottom servo at full CW position
                 b_servo_CCW_pos=False           # boolean of bottom servo at full CCW position
-                servo_off()                     # PWM signal at GPIO is stopped
                 return 'home'                   # position of the holder is returned
 
 
@@ -750,7 +741,6 @@ def rotate_out(direction):
                     
                 b_servo_stopped=True                      # boolean of bottom servo at location the lifter can be operated
                 b_servo_home=False                        # boolean of bottom servo at home
-                servo_off()                               # PWM signal at GPIO is stopped 
                 
                 if t_top_cover=='close':                  # case the top cover is in close position
                     open_cover()                          # top cover is raised in open position
