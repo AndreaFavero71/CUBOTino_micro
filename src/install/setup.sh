@@ -22,11 +22,13 @@ sed -i '/dtparam=spi/d' $CONFIG
 sed -i '/startx/d' $CONFIG
 sed -i '/gpu_mem/d' $CONFIG
 sed -i '/enable_uart/d' $CONFIG
+sed -i '/act_led/d' $CONFIG
 cat <<EOT >> $CONFIG
 dtparam=spi=on
 start_x=1
 gpu_mem=128
 enable_uart=1
+#dtoverlay=act-led,gpio=5
 EOT
 
 print_header "Updating packages"
