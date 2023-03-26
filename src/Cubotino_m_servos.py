@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero 19 March 2023
+# Andrea Favero 21 March 2023
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino series.
@@ -29,8 +29,6 @@
 """
 
 
-macs_AF = ('e4:5f:01:8d:59:97', 'b8:27:eb:b5:43:6b')
-
 
 ##################    imports for the display part   ################################
 from Cubotino_m_display import display as s_disp
@@ -51,7 +49,8 @@ GPIO.setwarnings(False)                           # setting GPIO to don't return
 from gpiozero import Servo, PWMLED                # import modules for the PWM part
 from gpiozero.pins.pigpio import PiGPIOFactory    # pigpio library is used, to use hardare timers on PWM (to avoid servo jitter)
 factory = PiGPIOFactory()                         # pin factory setting to use hardware timers, to avoid servo jitter
-
+from get_macs_AF import get_macs_AF               # import the get_macs_AF function
+macs_AF = get_macs_AF()                           # mac addresses of AF bots are retrieved
 
 
 # servo_settings for the led on top cover, to ensure sufficient light while the PiCamera is reading
@@ -75,6 +74,15 @@ fun_status=False                # boolean to track the robot fun status, it is T
 s_debug=False                   # boolean to print out info when debugging
 flip_to_close_one_step = False  # f_to_close steps (steps from flip up to close) is set false (=2 steps)
 # ##################################################################################
+
+
+
+
+def get_fname_AF(fname, pos):
+    """generates a filename based on fname and pos value.
+        This is used to match AF specific setting files to the mac address and its position on macs_AF.txt"""
+    return fname[:-4]+'_AF'+str(pos+1)+'.txt'
+
 
 
 
@@ -107,12 +115,15 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         from getmac import get_mac_address                               # library to get the device MAC ddress
         import os.path, pathlib, json                                    # libraries needed for the json, and parameter import
         
+        
+        fname = 'Cubotino_m_servo_settings.txt'                          # fname for the text file to retrieve settings
         folder = pathlib.Path().resolve()                                # active folder (should be home/pi/cube)  
         eth_mac = get_mac_address()                                      # mac address is retrieved
         if eth_mac in macs_AF:                                           # case the script is running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (do not use these at the start)
+            pos = macs_AF.index(eth_mac)                                 # return the mac addreess position in the tupple
+            fname = get_fname_AF(fname, pos)                             # generates the AF filename
         else:                                                            # case the script is not running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_servo_settings.txt') # folder and file name for the settings, to be tuned
+            fname = os.path.join(folder, fname)                          # folder and file name for the settings
          
         if os.path.exists(fname):                                        # case the servo_settings file exists
             with open(fname, "r") as f:                                  # servo_settings file is opened in reading mode

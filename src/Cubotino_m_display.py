@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 01 March 2023
+#  Andrea Favero 26 March 2023
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino versions
@@ -17,6 +17,10 @@ from PIL import Image, ImageDraw, ImageFont  # classes from PIL for image manipu
 import ST7789                                # library for the TFT display with ST7789 driver 
 import os.path, pathlib, json                # library for the json parameter parsing for the display
 from getmac import get_mac_address           # library to get the device MAC ddress
+from get_macs_AF import get_macs_AF          # import the get_macs_AF function
+macs_AF = get_macs_AF()                      # mac addresses of AF bots are retrieved
+
+
 
 class Display:
     def __init__(self):
@@ -24,13 +28,15 @@ class Display:
             (https://shop.pimoroni.com/products/adafruit-mini-pitft-135x240-color-tft-add-on-for-raspberry-pi).
             In my (AF) case 7.7€ from Aliexpress."""
                 
+        
+        
         # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac check
         folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
         eth_mac = get_mac_address()                                   # mac address is retrieved
-        if eth_mac == 'e4:5f:01:8d:59:97':                            # case the script is running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_settings_AF.txt') # AF robot settings (do not use these at the start)
-        elif eth_mac == 'e4:5f:01:8b:5f:e5':                          # case the script is running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_settings_AF2.txt')# AF second robot settings (do not use these at the start)
+        if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
+            pos = macs_AF.index(eth_mac)
+            fname = self.get_fname_AF('Cubotino_m_settings.txt', pos) # AF robot settings (do not use these at the start)
+#             fname = os.path.join(folder,'Cubotino_m_settings_AF.txt') # AF robot settings (do not use these at the start)
         else:                                                         # case the script is not running on AF (Andrea Favero) robot
             fname = os.path.join(folder,'Cubotino_m_settings.txt')    # folder and file name for the settings, to be tuned
         
@@ -137,11 +143,22 @@ class Display:
 
 
 
-    def show_cubotino(self):
+    def show_cubotino(self, built_by='', x=25, fs=22):
         """ Shows the Cubotino logo on the display."""
                 
         image = Image.open("Cubotino_m_Logo_265x212_BW.jpg")       # opens the CUBOTino logo image (jpg file)
         image = image.resize((self.disp_w, self.disp_h))           # resizes the image to match the display.
+        
+        if built_by != '': 
+            disp_draw = ImageDraw.Draw(image)                      # image is plotted to display
+            font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 19)  # font1
+            disp_draw.text((25, 4), "Andrea FAVERO's", font=font1, fill=(0, 0, 255))  # first row text test
+            
+            font2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)  # font1
+            disp_draw.text((80, 85), "Built by", font=font2, fill=(255, 255, 255))    # second row text test
+            
+            font3 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)  # font1
+            disp_draw.text((x, 106), built_by, font=font3, fill=(255, 0, 0))              # third row text test
         self.disp.display(image)                                   # draws the image on the display hardware.
 
 
@@ -291,6 +308,14 @@ class Display:
         self.clean_display()                                              # display is set to full black
         self.disp.set_backlight(0)                                        # display backlight is set off
         print("Buttons test finished\n")                                  # feedback is printed to the terminal
+
+
+
+
+    def get_fname_AF(self, fname, pos):
+        return fname[:-4] + '_AF' + str(pos+1) + '.txt'
+
+
 
 
 

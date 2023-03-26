@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 19 March 2023
+# Andrea Favero 21 March 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -11,9 +11,6 @@
 #
 ######################################################################################################################
 """
-
-
-macs_AF = ('e4:5f:01:8d:59:97', 'b8:27:eb:b5:43:6b')
 
 
 # ################################## Imports  ########################################################################
@@ -36,6 +33,8 @@ from Cubotino_m import read_camera as read_camera        # import the camera rea
 from Cubotino_m import frame_cropping as crop            # import the image cropping function
 from Cubotino_m import warp_image as warp                # import the image warping function
 from Cubotino_m import close_camera as close_cam         # import the close_camera function
+from get_macs_AF import get_macs_AF                      # import the get_macs_AF function
+macs_AF = get_macs_AF()                                  # mac addresses of AF bots are retrieved
 ######################################################################################################################
 
 
@@ -105,6 +104,15 @@ def take_image(refresh=1, widgets_freeze=True):
 
 
 # #################### functions to manage servos settings from/to files   ###########################################
+
+def get_fname_AF(fname, pos):
+    """generates a filename based on fname and pos value.
+        This is used to match AF specific setting files to the mac address and its position on macs_AF.txt"""
+    
+    return fname[:-4]+'_AF'+str(pos+1)+'.txt'
+
+
+
 def read_servo_settings_file(fname=''):
     """ Function to assign the servo settings to a dictionary, after testing their data type."""   
     
@@ -113,12 +121,14 @@ def read_servo_settings_file(fname=''):
     from getmac import get_mac_address                               # library to get the device MAC ddress
     
     if len(fname) == 0:                                              # case fname equals empty string
+        fname = 'Cubotino_m_servo_settings.txt'                      # fname for the text file to retrieve settings
         folder = pathlib.Path().resolve()                            # active folder (should be home/pi/cube)  
         eth_mac = get_mac_address()                                  # mac address is retrieved
         if eth_mac in macs_AF:                                       # case the script is running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+            pos = macs_AF.index(eth_mac)                             # return the mac addreess position in the tupple
+            fname = get_fname_AF(fname, pos)                         # generates the AF filename
         else:                                                        # case the script is not running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_servo_settings.txt') # folder and file name for the settings, to be tuned
+            fname = os.path.join(folder, fname)                      # folder and file name for the settings, to be tuned
     
     srv_settings = {}
     if os.path.exists(fname):                                        # case the servo_settings file exists
@@ -247,12 +257,14 @@ def update_servo_settings_dict():
 def load_previous_servo_settings():
     """ Function load the servo settings from latest json backup file saved."""
     
+    fname = 'Cubotino_m_servo_settings.txt'                    # fname for the text file to retrieve settings
     folder = pathlib.Path().resolve()                          # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                # mac address is retrieved
     if eth_mac in macs_AF:                                     # case the script is running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+        pos = macs_AF.index(eth_mac)                           # return the mac addreess position in the tupple
+        fname = get_fname_AF(fname, pos)                       # generates the AF filename
     else:                                                      # case the script is not running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_servo_settings.txt')   # folder and file name for the settings, to be tuned
+        fname = os.path.join(folder, fname)                    # folder and file name for the settings, to be tuned
     
     backup_fname = fname[:-4] + '_backup*.txt'
     backup_files = sorted(glob.iglob(backup_fname), key=os.path.getmtime, reverse=True) # ordered list of backuped settings files 
@@ -281,12 +293,14 @@ def save_new_servo_settings():
     
     global srv_settings
     
+    fname = 'Cubotino_m_servo_settings.txt'                    # fname for the text file to retrieve settings
     folder = pathlib.Path().resolve()                          # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                # mac address is retrieved
     if eth_mac in macs_AF:                                     # case the script is running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_servo_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+        pos = macs_AF.index(eth_mac)                           # return the mac addreess position in the tupple
+        fname = get_fname_AF(fname, pos)                       # generates the AF filename
     else:                                                      # case the script is not running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_servo_settings.txt') # folder and file name for the settings, to be tuned
+        fname = os.path.join(folder, fname)                    # folder and file name for the settings, to be tuned
     
     if os.path.exists(fname):                                  # case the servo_settings file exists    
         datetime = dt.datetime.now().strftime('%Y%m%d_%H%M%S') # date_time variable is assigned, for file name
@@ -371,12 +385,14 @@ def read_cam_settings_file(fname=''):
     from getmac import get_mac_address                         # library to get the device MAC ddress
     
     if len(fname) == 0:                                        # case fname equals empty string
+        fname = 'Cubotino_m_settings.txt'                      # fname for the text file to retrieve settings
         folder = pathlib.Path().resolve()                      # active folder (should be home/pi/cube)  
         eth_mac = get_mac_address()                            # mac address is retrieved
         if eth_mac in macs_AF:                                 # case the script is running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+            pos = macs_AF.index(eth_mac)                       # return the mac addreess position in the tupple
+            fname = get_fname_AF(fname, pos)                   # generates the AF filename
         else:                                                  # case the script is not running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_settings.txt')   # folder and file name for the settings, to be tuned
+            fname = os.path.join(folder, fname)                # folder and file name for the settings, to be tuned
     
 #     cam_settings = {}
     if os.path.exists(fname):                                  # case the settings file exists
@@ -422,12 +438,14 @@ def upload_cam_settings(cam_settings):
 def load_previous_cam_settings():
     """ Function load the cam settings from latest json backup file saved.""" 
     
+    fname = 'Cubotino_m_settings.txt'                          # fname for the text file to retrieve settings
     folder = pathlib.Path().resolve()                          # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                # mac address is retrieved
     if eth_mac in macs_AF:                                     # case the script is running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_settings_AF.txt')   # AF robot settings (optimized settings for AF bot)
+        pos = macs_AF.index(eth_mac)                           # return the mac addreess position in the tupple
+        fname = get_fname_AF(fname, pos)                       # generates the AF filename
     else:                                                      # case the script is not running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_settings.txt') # folder and file name for the settings, to be tuned
+        fname = os.path.join(folder, fname)                    # folder and file name for the settings, to be tuned
     
     backup_fname = fname[:-4] + '_backup*.txt'
     backup_files = sorted(glob.iglob(backup_fname), key=os.path.getmtime, reverse=True) # ordered list of backuped settings files 
@@ -472,12 +490,14 @@ def save_new_cam_settings():
     
     global cam_settings
     
+    fname = 'Cubotino_m_settings.txt'                              # fname for the text file to retrieve settings
     folder = pathlib.Path().resolve()                              # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                    # mac address is retrieved
     if eth_mac in macs_AF:                                         # case the script is running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_settings_AF.txt')  # AF robot settings (optimized settings for AF bot)
+        pos = macs_AF.index(eth_mac)                               # return the mac addreess position in the tupple
+        fname = get_fname_AF(fname, pos)                           # generates the AF filename
     else:                                                          # case the script is not running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_settings.txt')     # folder and file name for the settings, to be tuned
+        fname = os.path.join(folder, fname)                        # folder and file name for the settings, to be tuned
     
     if os.path.exists(fname):                                      # case the servo_settings file exists
         

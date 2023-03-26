@@ -3,7 +3,7 @@
 
 """ 
 #############################################################################################################
-#  Andrea Favero, 19 March 2023
+#  Andrea Favero, 26 March 2023
 #
 #
 #  This code relates to CUBOTino autonomous, a very small and simple Rubik's cube solver robot 3D printed.
@@ -31,7 +31,7 @@
 """
 
 # __version__ variable
-version = '0.2'
+version = '0.4'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -92,8 +92,18 @@ args = parser.parse_args()   # argument parsed assignement
 # ###############################################################################################
 
 
+from get_macs_AF import get_macs_AF                      # import the get_macs_AF function
+macs_AF = get_macs_AF()                                  # mac addresses of AF bots are retrieved
 
-macs_AF = ('e4:5f:01:8d:59:97', 'b8:27:eb:b5:43:6b')
+
+
+def get_fname_AF(fname, pos):
+    """generates a filename based on fname and pos value.
+        This is used to match AF specific setting files to the mac address and its position on macs_AF.txt"""
+    return fname[:-4]+'_AF'+str(pos+1)+'.txt'
+
+
+
 
 
 def import_parameters(debug=False):
@@ -104,24 +114,30 @@ def import_parameters(debug=False):
     global kl, x_l, x_r, y_u, y_b, w_f, w_s, square_ratio, rhombus_ratio
     global delta_area_limit, sv_max_moves, sv_max_time, collage_w, marg_coef, cam_led_bright, cam_led_auto
     global detect_timeout, show_time, warn_time, quit_time, cover_self_close, vnc_delay
+    global built_by, built_by_x, built_by_fs
     global pathlib, json
     
     # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac address check
     import os.path, pathlib, json                                 # libraries needed for the json, and parameter import
     from getmac import get_mac_address                            # library to get the device MAC ddress
     import time
-       
+    
+    fname = 'Cubotino_m_settings.txt'                             # fname for the text file to retrieve settings
     folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
     eth_mac = get_mac_address()                                   # mac address is retrieved
     if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_settings_AF.txt') # AF robot settings (do not use these at the start)
+        pos = macs_AF.index(eth_mac)                              # return the mac addreess position in the tupple
+        fname = get_fname_AF(fname, pos)                          # generates the AF filename
     else:                                                         # case the script is not running on AF (Andrea Favero) robot
-        fname = os.path.join(folder,'Cubotino_m_settings.txt')    # folder and file name for the settings, to be tuned
+        fname = os.path.join(folder, fname)                       # folder and file name for the settings, to be tuned
     
     if os.path.exists(fname):                                     # case the settings file exists
         with open(fname, "r") as f:                               # settings file is opened in reading mode
             settings = json.load(f)                               # json file is parsed to a local dict variable
             # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
+        
+        # update key-values parameters, needed in case of additional parameters added at remote repo
+        settings = update_parameters(fname, settings)
         
         if debug:                                                 # case debug variable is set true on __main_
             print('\nimporting settings from the text file:', fname)    # feedback is printed to the termina
@@ -179,6 +195,9 @@ def import_parameters(debug=False):
             warn_time = float(settings['warn_time'])                  # solve button pressing time before get a worning
             quit_time = float(settings['quit_time'])                  # solve button pressing time before the quit process
             vnc_delay = float(settings['vnc_delay'])                  # delay for cube moving to next face at scan (for VNC viewer)
+            built_by = settings['built_by']                           # maker's name to add on the Cubotino logo
+            built_by_x = int(settings['built_by_x'])                  # x coordinate for maker's name on display
+            built_by_fs = int(settings['built_by_fs'])                # font size for the maker's name on display
             
             if settings['cover_self_close'].lower().strip() == 'false':  # case cover_self_close parameter is a string == false
                 cover_self_close = False                              # cover_self_close parameter is set boolean False
@@ -198,6 +217,42 @@ def import_parameters(debug=False):
     else:                                                       # case the settings file does not exists, or name differs
         print('could not find Cubotino_m_servo_settings.txt')   # feedback is printed to the terminal                                  
         return False, ''                                        # return robot_init_status variable, that is False
+
+
+
+
+
+
+
+def update_parameters(fname, settings):
+    """Function to check if the existing fname (Cubotino_m_settings.txt) has all the parameters that were instroduced after firts release.
+        This will allow every Makers to 'git pull' the updates while pre-serving personal settings.
+        This works by adding  *_settings.txt to gitignore.
+        Cubotino_m.py will update Cubotino_m_settings.txt with eventually missed parameters and related default values.
+        """
+    
+    settings_keys = settings.keys()
+    any_change = False
+    
+    if 'built_by' not in settings_keys:
+        settings['built_by']=''
+        any_change = True
+        
+    if 'built_by_x' not in settings_keys:
+        settings['built_by_x']='25'
+        any_change = True
+        
+    if 'built_by_fs' not in settings_keys:
+        settings['built_by_fs']='22'
+        any_change = True
+    
+    if any_change:
+        print('\nOne time action: Adding new parameters to the Cubotino_m_settings.txt')
+        print('Action necessary for compatibility with the latest downloaded Cubotino_m.py \n')
+        with open(fname, 'w') as f:
+            f.write(json.dumps(settings, indent=0))   # content of the updated setting is saved 
+    
+    return settings
 
 
 
@@ -276,7 +331,7 @@ def press_to_start():
     while True:                                # infinite loop
         if time.time() - ref_time >= display_time:   # time is checked
             if not cubotino_logo:              # case cubotino logo boolean is false  
-                disp.show_cubotino()           # shows the Cubotino logo on the display, for delay time
+                disp.show_cubotino(built_by, built_by_x, built_by_fs)  # shows the Cubotino logo on the display, for delay time
                 ref_time = time.time()         # current time is assigned to ref_time variable
                 cubotino_logo = True           # cubotino logo boolean is set true                           
             else:                              # case cubotino logo boolean is false  
@@ -1971,7 +2026,7 @@ def scrambling_cube():
             inspec_time = 15            # time to let user studying the cube status
             left_time_str ='00:00.0'    # left_time_str initialized to prevent potential missed variable error
             t_ref = dt.datetime.now()   # current datetime is assigned to t_ref as reference
-            while GPIO.input(solve_btn):     # while the button is not pressed
+            while (GPIO.input(solve_btn) or GPIO.input(scramble_btn)):   # while the buttons aren't pressed
                 left_time =  (dt.datetime.now() - t_ref).seconds  # elapsed time in seconds (integer) assigned to d_time
                 if left_time  <= inspec_time:  # case left time is smaller than inspect_time
                     left_time_str = str(dt.timedelta(seconds = inspec_time - left_time))[2:]+'.0'  # left time in secs converted to time string
@@ -1988,14 +2043,14 @@ def scrambling_cube():
             d_time_str ='00:00.0'       # d_time_string initialized to prevent potential missed variable error
             disp.show_on_display(d_time_str, 'PRESS TO STOP', y2=85, fs1=46, fs2=22)   # feedback is printed to the display
             
-            if not GPIO.input(solve_btn):   # case the button is pressed
+            if not GPIO.input(solve_btn) or not GPIO.input(scramble_btn):   # case one button is pressed
                 time.sleep(2)           # delay to prevent skipping the next part is button pushed while INSPECT. TIME
             
             timer_timeout = False       # boolean to track whether the timer timeout has been reached
             t_ref = time.time()         # current time assigned to t_ref as reference for overall time
             t_ref2 = time.time()        # current time assigned to t_ref2 as reference for fraction of second
             secs = 0.0                  # variable secs is set to zero
-            while  GPIO.input(solve_btn):       # while the button is not pressed
+            while  GPIO.input(solve_btn) and GPIO.input(scramble_btn):   # while the buttons aren't pressed
                 d_time = int(time.time() - t_ref)  # elapsed time in seconds (float) assigned to d_time
                 if time.time() - t_ref2 >= 0.1:    # case other 0.1 secs have elapsed
                     t_ref2 = time.time()           # time reference used for fraction of second is asigned
@@ -3284,7 +3339,7 @@ def quit_func(quit_script, error = False):
         
         try:
             servo.servo_off()         # PWM is stopped at the servos GPIO pins
-            tikme.sleep(0.1)          # little delay
+            time.sleep(0.1)           # little delay
             servo.quit_func()         # sets to low the GPIO pins used as output
         except:
             print("raised exception while servo.quit_func at script quitting")   # feedback is printed to the terminal
