@@ -28,7 +28,7 @@ dtparam=spi=on
 start_x=1
 gpu_mem=128
 enable_uart=1
-#dtoverlay=act-led,gpio=5
+#dtoverlay=act-led,gpio=6
 EOT
 
 print_header "Updating packages"
