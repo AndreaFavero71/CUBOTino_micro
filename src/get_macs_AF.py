@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 20 March 2023
+# Andrea Favero 06 May 2023
 # 
 # Little script returning a tuple with mac adresses from a text file
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -20,7 +20,6 @@ def get_macs_AF():
     with open(fname, "r") as f:                   # file is opened in reading mode
         macs = f.readlines()                      # text lines are retrieved
         for mac in macs:                          # iteration over the lines
-            macs_AF.append(mac.strip())           # stripped lines contents are appended to the mac list
-    
+            macs_AF.append(mac.strip().lower())   # stripped lines contents are appended to the mac list
     return tuple(macs_AF)                         # list is converted to tuple and returned
     

@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 26 March 2023
+#  Andrea Favero 06 May 2023
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino versions
@@ -32,11 +32,10 @@ class Display:
         
         # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac check
         folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
-        eth_mac = get_mac_address()                                   # mac address is retrieved
+        eth_mac = get_mac_address().lower()                           # mac address is retrieved
         if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
-            pos = macs_AF.index(eth_mac)
+            pos = macs_AF.index(eth_mac)                              # returns the mac addreess position in the tupple
             fname = self.get_fname_AF('Cubotino_m_settings.txt', pos) # AF robot settings (do not use these at the start)
-#             fname = os.path.join(folder,'Cubotino_m_settings_AF.txt') # AF robot settings (do not use these at the start)
         else:                                                         # case the script is not running on AF (Andrea Favero) robot
             fname = os.path.join(folder,'Cubotino_m_settings.txt')    # folder and file name for the settings, to be tuned
         
@@ -169,10 +168,10 @@ class Display:
         
         w = self.disp_w                                    # display width, retrieved by display setting
         h = self.disp_h                                    # display height, retrieved by display setting
-        faces = ('', 'U', 'B', 'D', 'F', 'R', 'L')             # tuple of faces letters
+        faces = ('', 'U', 'B', 'D', 'F', 'R', 'L')         # tuple of faces letters
         y_start = 10                                       # y coordinate for face top-left corner
         d = int(h-2*y_start)/3                             # facelet square side
-        x_start = w-5-3*d                                 # x coordinate for face top-left corner
+        x_start = w-5-3*d                                  # x coordinate for face top-left corner
         gap = 5                                            # gap beftweem the facelets border and facelets coloured part
         
         font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)  # font1
@@ -220,23 +219,23 @@ class Display:
         
         font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)  # font1
         font2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)  # font2
-        disp_img = Image.new('RGB', (w, h), color=(0, 0, 0))      # full black image
+        disp_img = Image.new('RGB', (w, h), color=(0, 0, 0))       # full black image
         
-        self.disp.set_backlight(1)                                        # display backlight is set on
-        start = time.time()                                               # time refrence for countdown
-        timeout = 20.5                                                    # timeout
-        while time.time() < start + timeout:                              # while loop until timeout
+        self.disp.set_backlight(1)                                 # display backlight is set on
+        start = time.time()                                        # time refrence for countdown
+        timeout = 20.5                                             # timeout
+        while time.time() < start + timeout:                       # while loop until timeout
             
-            if not GPIO.input(23) or not GPIO.input(24):                  # case one of the buttons is pressed
-                break                                                     # while loop is interrupted
+            if not GPIO.input(23) or not GPIO.input(24):           # case one of the buttons is pressed
+                break                                              # while loop is interrupted
             
-            t_left = int(round(timeout + start - time.time(),0))          # time left
+            t_left = int(round(timeout + start - time.time(),0))   # time left
             
-            if t_left%2==0:                                               # case the time left is even
-                t_left_str = str(t_left)                                  # string of time left
-                pos = 184 if t_left>9 else 199                            # position x for timeout text
-                disp_img = Image.new('RGB', (w, h), color=(0, 0, 0))      # full black image
-                disp_draw = ImageDraw.Draw(disp_img)                      # image is plotted to display
+            if t_left%2==0:                                        # case the time left is even
+                t_left_str = str(t_left)                           # string of time left
+                pos = 184 if t_left>9 else 199                     # position x for timeout text
+                disp_img = Image.new('RGB', (w, h), color=(0, 0, 0))   # full black image
+                disp_draw = ImageDraw.Draw(disp_img)               # image is plotted to display
 
                 disp_draw.rectangle((2, 2, w-4, h-4), outline="white", fill=(0,0,0))    # border 1
                 disp_draw.rectangle((5, 5, w-7, h-7), outline="white", fill=(0,0,0))    # border 2
@@ -246,18 +245,18 @@ class Display:
                 disp_draw.text((pos, h-45), t_left_str , font=font2, fill=(255, 0, 0))  # timeout text
                 disp_draw.text((30, 25), 'DISPLAY', font=font1, fill=(255, 255, 255))   # first row text test
                 disp_draw.text((33, 75), 'TEST', font=font1, fill=(255, 255, 255))      # second row text test
-                self.disp.display(disp_img)                                             # image is plotted to the display
-                time.sleep(0.1)                                           # little sleeping time   
-            else:                                                         # case the time left is odd
-                self.show_cubotino()                                      # cubotino logo is displayed
-                time.sleep(0.1)                                           # little sleeping time
+                self.disp.display(disp_img)                        # image is plotted to the display
+                time.sleep(0.1)                                    # little sleeping time   
+            else:                                                  # case the time left is odd
+                self.show_cubotino()                               # cubotino logo is displayed
+                time.sleep(0.1)                                    # little sleeping time
         
-        if time.time() >= start + timeout:                                # case the while loop hasn't been interrupted
-            time.sleep(1)                                                 # little sleeping time
-        self.clean_display()                                              # display is set to full black
-        self.disp.set_backlight(0)                                        # display backlight is set off
-        time.sleep(1)                                                     # little sleeping time
-        print("Display test finished\n")                                  # feedback is printed to the terminal
+        if time.time() >= start + timeout:                         # case the while loop hasn't been interrupted
+            time.sleep(1)                                          # little sleeping time
+        self.clean_display()                                       # display is set to full black
+        self.disp.set_backlight(0)                                 # display backlight is set off
+        time.sleep(1)                                              # little sleeping time
+        print("Display test finished\n")                           # feedback is printed to the terminal
 
 
 
@@ -282,41 +281,38 @@ class Display:
         
         font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)  # font1
         font2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)  # font2
-        disp_img = Image.new('RGB', (w, h), color=(0, 0, 0))      # full black image
+        disp_img = Image.new('RGB', (w, h), color=(0, 0, 0))       # full black image
         
-        self.disp.set_backlight(1)                                        # display backlight is set on
-        start = time.time()                                               # time refrence for countdown
-        timeout = 30                                                      # timeout
-        while time.time() < start + timeout:                              # while loop until timeout
-            t_left = str(int(round(timeout + start - time.time(),0)))     # time left
-            pos = 195 if len(t_left)>1 else 210                           # position x for timeout text
+        self.disp.set_backlight(1)                                 # display backlight is set on
+        start = time.time()                                        # time refrence for countdown
+        timeout = 30                                               # timeout
+        while time.time() < start + timeout:                       # while loop until timeout
+            t_left = str(int(round(timeout + start - time.time(),0)))   # time left
+            pos = 195 if len(t_left)>1 else 210                    # position x for timeout text
             col1 = (0, 255, 0) if not GPIO.input(23) else (255, 255, 255) # case upper button is pressed                        
             col2 = (0, 255, 0) if not GPIO.input(24) else (255, 255, 255) # case bottom button is pressed
-            if not GPIO.input(23) and not GPIO.input(24):                 # case both buttons are pressed
-                col1 = col2 = (255, 0, 0)                                 # red color is assigned
+            if not GPIO.input(23) and not GPIO.input(24):          # case both buttons are pressed
+                col1 = col2 = (255, 0, 0)                          # red color is assigned
             
-            disp_draw = ImageDraw.Draw(disp_img)                          # image is plotted to display
+            disp_draw = ImageDraw.Draw(disp_img)                   # image is plotted to display
             disp_draw.rectangle((183, h-42, w-4, h-4), outline="red", fill=(0,0,0))  # border for timeout
             disp_draw.text((pos, h-35), t_left , font=font2, fill=(255, 0, 0))      # timeout text
             disp_draw.text((20, 25), 'BUTTONS', font=font1, fill=col1)      # first row text test
             disp_draw.text((20, 75), 'TEST', font=font1, fill=col2)    # second row text test
             
-            self.disp.display(disp_img)                                   # image is plotted to the display
+            self.disp.display(disp_img)                            # image is plotted to the display
         
-        self.show_cubotino()                                              # cubotino logo is show to display
-        time.sleep(2)                                                     # little delay
-        self.clean_display()                                              # display is set to full black
-        self.disp.set_backlight(0)                                        # display backlight is set off
-        print("Buttons test finished\n")                                  # feedback is printed to the terminal
+        self.show_cubotino()                                       # cubotino logo is show to display
+        time.sleep(2)                                              # little delay
+        self.clean_display()                                       # display is set to full black
+        self.disp.set_backlight(0)                                 # display backlight is set off
+        print("Buttons test finished\n")                           # feedback is printed to the terminal
 
 
 
 
     def get_fname_AF(self, fname, pos):
         return fname[:-4] + '_AF' + str(pos+1) + '.txt'
-
-
-
 
 
 

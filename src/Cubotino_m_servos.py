@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-# Andrea Favero 21 March 2023
+# Andrea Favero 06 May 2023
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino series.
@@ -118,9 +118,9 @@ def init_servo(print_out=s_debug, start_pos=0, f_to_close_mode=False):
         
         fname = 'Cubotino_m_servo_settings.txt'                          # fname for the text file to retrieve settings
         folder = pathlib.Path().resolve()                                # active folder (should be home/pi/cube)  
-        eth_mac = get_mac_address()                                      # mac address is retrieved
+        eth_mac = get_mac_address().lower()                              # mac address is retrieved
         if eth_mac in macs_AF:                                           # case the script is running on AF (Andrea Favero) robot
-            pos = macs_AF.index(eth_mac)                                 # return the mac addreess position in the tupple
+            pos = macs_AF.index(eth_mac)                                 # returns the mac addreess position in the tupple
             fname = get_fname_AF(fname, pos)                             # generates the AF filename
         else:                                                            # case the script is not running on AF (Andrea Favero) robot
             fname = os.path.join(folder, fname)                          # folder and file name for the settings
@@ -413,6 +413,23 @@ def stop_release(print_out=s_debug):
 
 
 
+def open_pos():
+    """ Function to position the top_cover to the open position, without waiting time !!!"""
+    global t_top_cover, b_servo_operable, b_servo_stopped
+    
+    if not stop_servos:                          # case there is not a stop request for servos
+        if b_servo_stopped==True:                # boolean of bottom servo at location the lifter can be operated
+            b_servo_operable=False               # variable to block/allow bottom servo operation
+            t_servo.value = t_servo_open         # servo is positioned to open
+            t_top_cover='open'                   # cover/lifter position variable set to open
+            b_servo_operable=True                # variable to block/allow bottom servo operation
+
+
+
+
+
+
+
 def read():
     """ Function to position the top_cover to the read."""
     global t_top_cover, b_servo_operable, b_servo_stopped, b_servo_home
@@ -448,11 +465,29 @@ def flip_up():
         if b_servo_stopped==True:                # boolean of bottom servo at location the lifter can be operated
             b_servo_operable=False               # variable to block/allow bottom servo operation
             if t_top_cover == 'close':           # cover/lifter position variable set to close
-                t_servo.value = t_servo_flip     # servo is positioned to flip the cube
-                time.sleep(t_close_to_flip_time) # time for the servo to reach the flipping position from close position
-            elif t_top_cover == 'open' or t_top_cover == 'read':   # cover/lifter position variable set to open or read positions
-                t_servo.value = t_servo_flip     # servo is positioned to flip the cube
-                time.sleep(t_flip_open_time)     # time for the servo to reach the flipping position
+                if not flip_to_close_one_step:   # case the flip to close is not set to one step (the slow way, not requiring perfect tuning)
+                    t_servo.value = t_servo_read # servo is positioned to the read position
+                    time.sleep(t_close_to_flip_time) # time for the servo to reach the read position from close position
+                    t_servo.value = t_servo_flip # servo is positioned to flip the cube
+                    time.sleep(t_flip_open_time) # time for the servo to reach the read position from close position
+                else:                            # case the flip to close is set to one step (the fast way, requiring good tuning)
+                    t_servo.value = t_servo_flip # servo is positioned to flip the cube
+                    time.sleep(t_close_to_flip_time) # time for the servo to reach the flipping position from close position
+                    
+            elif t_top_cover == 'open' :         # cover/lifter position variable set to open positions
+                if not flip_to_close_one_step:   # case the flip to close is not set to one step (the slow way, not requiring perfect tuning)
+                    t_servo.value = t_servo_read # servo is positioned to the read position
+                    time.sleep(t_flip_open_time) # time for the servo to reach the read position from close position
+                    t_servo.value = t_servo_flip # servo is positioned to flip the cube
+                    time.sleep(t_flip_open_time) # time for the servo to reach the read position from close position
+                else:                            # case the flip to close is set to one step (the fast way, requiring good tuning)
+                    t_servo.value = t_servo_flip # servo is positioned to flip the cube
+                    time.sleep(t_flip_open_time) # time for the servo to reach the flipping position
+            
+            elif t_top_cover == 'read':          # cover/lifter position variable set to open or read positions
+                    t_servo.value = t_servo_flip # servo is positioned to flip the cube
+                    time.sleep(t_flip_open_time) # time for the servo to reach the flipping position
+            
             t_top_cover='flip'                   # cover/lifter position variable set to flip
 
 
@@ -1467,7 +1502,8 @@ if __name__ == "__main__":
     ###############  testing the servos as a predefined solving process ###########################
     
     else:     # case the Cubotino_m_servos.py has been launched without 'set' or 'tune' arguments
-        test_set_of_movements()   # call to the function that holds the predefined set of movements
+#         test_set_of_movements()   # call to the function that holds the predefined set of movements
+        pass
         
         
 

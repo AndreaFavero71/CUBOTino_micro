@@ -3,7 +3,7 @@
 
 """ 
 #############################################################################################################
-#  Andrea Favero, 26 March 2023
+#  Andrea Favero, 06 May 2023
 #
 #
 #  This code relates to CUBOTino autonomous, a very small and simple Rubik's cube solver robot 3D printed.
@@ -31,7 +31,7 @@
 """
 
 # __version__ variable
-version = '0.4'
+version = '0.5   06 May 2023'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -124,9 +124,9 @@ def import_parameters(debug=False):
     
     fname = 'Cubotino_m_settings.txt'                             # fname for the text file to retrieve settings
     folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
-    eth_mac = get_mac_address()                                   # mac address is retrieved
+    eth_mac = get_mac_address().lower()                           # mac address is retrieved
     if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
-        pos = macs_AF.index(eth_mac)                              # return the mac addreess position in the tupple
+        pos = macs_AF.index(eth_mac)                              # returns the mac addreess position in the tupple
         fname = get_fname_AF(fname, pos)                          # generates the AF filename
     else:                                                         # case the script is not running on AF (Andrea Favero) robot
         fname = os.path.join(folder, fname)                       # folder and file name for the settings, to be tuned
@@ -2543,6 +2543,7 @@ def robot_to_cube_side(side, cam_led_bright):
 #             servo.cam_led_On(cam_led_bright)     # led on top_cover is switched on
   
     elif side == 6 :                             # case side equal 6 (it is when the cube has been fully scanned)
+        servo.open_pos()                         # top_cover is positioned to open position
         servo.cam_led_Off()                      # led on top_cover is switched off
 
 

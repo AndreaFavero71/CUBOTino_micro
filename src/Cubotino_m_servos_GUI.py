@@ -3,7 +3,7 @@
 
 """
 ######################################################################################################################
-# Andrea Favero 21 March 2023
+# Andrea Favero 06 May 2023
 # 
 # GUI helping tuninig CUBOTino servos positions.
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -123,9 +123,13 @@ def read_servo_settings_file(fname=''):
     if len(fname) == 0:                                              # case fname equals empty string
         fname = 'Cubotino_m_servo_settings.txt'                      # fname for the text file to retrieve settings
         folder = pathlib.Path().resolve()                            # active folder (should be home/pi/cube)  
-        eth_mac = get_mac_address()                                  # mac address is retrieved
+        eth_mac = get_mac_address().lower()                          # mac address is retrieved
+        
         if eth_mac in macs_AF:                                       # case the script is running on AF (Andrea Favero) robot
-            pos = macs_AF.index(eth_mac)                             # return the mac addreess position in the tupple
+#             print("Detected mac address:", eth_mac)                  # feedback is printed to the terminal
+#             print("macs in macs_AF.txt:", macs_AF)                   # feedback is printed to the terminal
+            pos = macs_AF.index(eth_mac)                             # returns the mac addreess position in the tupple
+#             print("mac_AF pos in macs_AF.txt :", pos)                # feedback is printed to the terminal
             fname = get_fname_AF(fname, pos)                         # generates the AF filename
         else:                                                        # case the script is not running on AF (Andrea Favero) robot
             fname = os.path.join(folder, fname)                      # folder and file name for the settings, to be tuned
