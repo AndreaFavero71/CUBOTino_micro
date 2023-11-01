@@ -19,7 +19,7 @@ ssh pi@cubotino.local
 4. If you can't reach the pi like this, you will have to scan your network to find the IP to use
 5. After you are connected via ssh, type the following commands in the shell:
 ```
-git clone https://github.com/AndreaFavero71/CUBOTino_micro.git
+git clone https://github.com/AndreaFavero71/cubotino_micro.git
 cd cubotino_micro/src
 sudo ./install/setup.sh
 ```
