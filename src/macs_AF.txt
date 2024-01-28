@@ -1,7 +1,0 @@
-e4:5f:01:8d:59:97
-b8:27:eb:b5:43:6b
-B8:27:EB:1C:49:86
-
-1st bot, with Zero2W board
-1st bot, with ZeroW board
-2nd bot, with ZeroW board
