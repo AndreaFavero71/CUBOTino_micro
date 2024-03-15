@@ -3,7 +3,7 @@
 
 """
 #############################################################################################################
-#  Andrea Favero 06 May 2023
+#  Andrea Favero 15 March 2024
 #
 # This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
 # CUBOTino micro is the smallest version of the CUBOTino versions
@@ -13,60 +13,69 @@
 """
 
 
+from Cubotino_m_settings_manager import settings as settings   # custom library managing the settings from<>to the settings files
 from PIL import Image, ImageDraw, ImageFont  # classes from PIL for image manipulation
 import ST7789                                # library for the TFT display with ST7789 driver 
-import os.path, pathlib, json                # library for the json parameter parsing for the display
-from getmac import get_mac_address           # library to get the device MAC ddress
-from get_macs_AF import get_macs_AF          # import the get_macs_AF function
-macs_AF = get_macs_AF()                      # mac addresses of AF bots are retrieved
+import os.path, pathlib                      # libraries for path management
 
 
 
 class Display:
+    display_initialized = False
     def __init__(self):
         """ Imports and set the display.
             (https://shop.pimoroni.com/products/adafruit-mini-pitft-135x240-color-tft-add-on-for-raspberry-pi).
             In my (AF) case 7.7€ from Aliexpress."""
                 
+        if not self.display_initialized:
+            s = settings.get_settings()                               # settings are retrieved from the settings Class
+            self.disp_width = int(s['disp_width'])                    # display width, in pixels
+            self.disp_height = int(s['disp_height'])                  # display height, in pixels
+            self.disp_offsetL = int(s['disp_offsetL'])                # Display offset on width, in pixels, Left if negative
+            self.disp_offsetT = int(s['disp_offsetT'])                # Display offset on height, in pixels, Top if negative
+            self.built_by = str(s['built_by'])                        # maker's name to add on the Cubotino logo
+            self.built_by_x = int(s['built_by_x'])                    # x coordinate for maker's name on display
+            self.built_by_fs = int(s['built_by_fs'])                  # font size for the maker's name on display
+            self.display_settings = True                              # display_settings is set True
         
-        
-        # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac check
-        folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
-        eth_mac = get_mac_address().lower()                           # mac address is retrieved
-        if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
-            pos = macs_AF.index(eth_mac)                              # returns the mac addreess position in the tupple
-            fname = self.get_fname_AF('Cubotino_m_settings.txt', pos) # AF robot settings (do not use these at the start)
-        else:                                                         # case the script is not running on AF (Andrea Favero) robot
-            fname = os.path.join(folder,'Cubotino_m_settings.txt')    # folder and file name for the settings, to be tuned
-        
-        if os.path.exists(fname):                                     # case the settings file exists
-            with open(fname, "r") as f:                               # settings file is opened in reading mode
-                settings = json.load(f)                               # json file is parsed to a local dict variable
-            try:
-                disp_width = int(settings['disp_width'])              # display width, in pixels
-                disp_height = int(settings['disp_height'])            # display height, in pixels
-                disp_offsetL = int(settings['disp_offsetL'])          # Display offset on width, in pixels, Left if negative
-                disp_offsetT = int(settings['disp_offsetT'])          # Display offset on height, in pixels, Top if negative
-            except:
-                print('error on converting imported parameters to int') # feedback is printed to the terminal
-        else:                                                         # case the settings file does not exists, or name differs
-            print('could not find the file: ', fname)                 # feedback is printed to the terminal 
-
+        if not self.display_settings:                                 # case display_settings is still False
+            print("Error on loading the display parameters at Cubotino_m_display")
         
         self.disp = ST7789.ST7789(port=0, cs=0,                       # SPI and Chip Selection                  
                             dc=25, backlight=22,                      # GPIO pins used for the SPI and backlight control
-                            width=disp_width,            #(AF 240)    # see note above for width and height !!!
-                            height=disp_height,          #(AF 135)    # see note above for width and height !!!                         
-                            offset_left=disp_offsetL,    #(AF 40)     # see note above for offset  !!!
-                            offset_top= disp_offsetT,    #(AF 53)     # see note above for offset  !!!
-                            rotation=0,                               # image orientation
-                            invert=True, spi_speed_hz=10000000)       # image invertion, and SPI     
+                            width = self.disp_width,         #(AF 240)  # see note above for width and height !!!
+                            height = self.disp_height,       #(AF 135)  # see note above for width and height !!!                         
+                            offset_left = self.disp_offsetL, #(AF 40)   # see note above for offset  !!!
+                            offset_top = self.disp_offsetT,  #(AF 53)   # see note above for offset  !!!
+                            rotation = 0,                             # image orientation
+                            invert = True,                            # image invertion
+                            spi_speed_hz=10000000)                    # SPI frequency
         
         self.disp.set_backlight(0)                                    # display backlight is set off
         self.disp_w = self.disp.width                                 # display width, retrieved by display setting
         self.disp_h = self.disp.height                                # display height, retrieved by display setting
         disp_img = Image.new('RGB', (self.disp_w, self.disp_h),color=(0, 0, 0))   # display image generation, full black
         self.disp.display(disp_img)                                   # image is displayed
+        if not self.display_initialized:                              # case display_initialized is set False
+            print("\nDisplay initialized\n")                          # feedback is printed to the terminal
+            self.display_initialized = True                           # display_initialized is set True
+        
+        # loading the CUBOTino logo
+        folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)
+        fname = "Cubotino_m_Logo_265x212_BW.jpg"                      # file name with logo image
+        fname = os.path.join(folder,fname)                            # folder and file name for the logo image
+        if os.path.exists(fname):                                     # case the logo file exists
+            logo = Image.open(fname)                                  # opens the CUBOTino logo image (jpg file)
+            self.logo = logo.resize((self.disp_w, self.disp_h))       # resizes the image to match the display.
+        else:                                                         # case the logo file does not exist
+            print(f"\nNot found {fname}")                             # feedback is printedto terminal
+            print("Cubotino logo image is missed\n")                  # feedback is printedto terminal
+            self.logo = Image.new('RGB', (self.disp_w, self.disp_h), color=(0, 0, 0))  # full black screen as new image
+            logo_text = ImageDraw.Draw(self.logo)                     # image is drawned
+            f1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)  # font and size
+            f2 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 29)  # font and size
+            logo_text.text((10, 44), "CUBOT", font=f1, fill=(255, 255, 255))  # text, font, white color
+            logo_text.text((165, 56), "ino", font=f2, fill=(255, 255, 255))   # text, font, white color
 
 
 
@@ -134,22 +143,21 @@ class Display:
             
         barLength = w-2*x-4 #210         # lenght of the bar, in pixels
         filledPixels = int( x+gap +(barLength-2*gap)*percent/100)  # bar filling length, as function of the percent
-        disp_draw.rectangle((x, y, x+barLength, y+barWidth), outline="white", fill=(0,0,0))      # outer bar border
-        disp_draw.rectangle((x+gap, y+gap, filledPixels, y+barWidth-gap), fill=(255,255,255)) # bar filling
+        disp_draw.rectangle((x, y, x+barLength, y+barWidth), outline="white", fill=(0,0,0))    # outer bar border
+        disp_draw.rectangle((x+gap, y+gap, filledPixels, y+barWidth-gap), fill=(255,255,255))  # bar filling
         
         self.disp.display(disp_img) # image is plotted to the display
+        self.disp.set_backlight(1)  # display backlight is set on
+
 
 
 
 
     def show_cubotino(self, built_by='', x=25, fs=22):
         """ Shows the Cubotino logo on the display."""
-                
-        image = Image.open("Cubotino_m_Logo_265x212_BW.jpg")       # opens the CUBOTino logo image (jpg file)
-        image = image.resize((self.disp_w, self.disp_h))           # resizes the image to match the display.
         
         if built_by != '': 
-            disp_draw = ImageDraw.Draw(image)                      # image is plotted to display
+            disp_draw = ImageDraw.Draw(self.logo)          # image is plotted to display
             font1 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 19)  # font1
             disp_draw.text((25, 4), "Andrea FAVERO's", font=font1, fill=(0, 0, 255))  # first row text test
             
@@ -158,7 +166,10 @@ class Display:
             
             font3 = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)  # font1
             disp_draw.text((x, 106), built_by, font=font3, fill=(255, 0, 0))              # third row text test
-        self.disp.display(image)                                   # draws the image on the display hardware.
+        
+        self.disp.display(self.logo)                       # draws the image on the display hardware.
+        self.disp.set_backlight(1)                         # display backlight is set on
+
 
 
 
@@ -199,6 +210,60 @@ class Display:
 
 
 
+    def plot_status(self, cube_status, plot_color, startup=False):
+        """ Function to print the cube sketch of the cube colors."""
+        
+        if startup:
+            self.c = plot_color
+
+            x_start = 30                                   # x coordinate for face top-left corner
+            y_start = 4                                    # y coordinate for face top-left corner
+            s = 2                                          # gap between faces
+            self.d = 14                                    # facelet square side
+            self.g = 1                                     # offset for xy origin-square of colored facelet
+            self.gg = 2*self.g                             # offset for xy end-square of colored facelet
+            
+            # dict with the top-left coordinate of each face (not facelets !)
+            starts={0:(x_start+3*self.d+  s, y_start),
+                    1:(x_start+6*self.d+2*s, y_start+3*self.d+  s),
+                    2:(x_start+3*self.d+  s, y_start+3*self.d+  s),
+                    3:(x_start+3*self.d+  s, y_start+6*self.d+2*s),
+                    4:(x_start,              y_start+3*self.d+  s),
+                    5:(x_start+9*self.d+3*s, y_start+3*self.d+  s)}
+            
+            # coordinate origin for the 54 facelets
+            tlc=[]                                         # list of all the top-left vertex coordinate for the 54 facelets
+            for value in starts.values():                  # iteration over the 6 faces
+                x_start=value[0]                           # x coordinate fo the face top left corner
+                y_start=value[1]                           # y coordinate fo the face top left corner
+                y = y_start                                # y coordinate value for the first 3 facelets
+                for i in range(3):                         # iteration over rows
+                    x = x_start                            # x coordinate value for the first facelet
+                    for j in range(3):                     # iteration over columns
+                        tlc.append((x, y))                 # x and y coordinate, as list, for the top left vertex of the facelet is appendended
+                        x = x+self.d                       # x coordinate is increased by square side
+                        if j == 2: y = y+self.d            # once at the second column the row is incremented
+            self.tlc = tuple(tlc)                          # tlc list is converted to tuple
+            
+            self.disp_img = Image.new('RGB', (self.disp_w, self.disp_h), color=(0, 0, 0))  # full black image
+            self.disp_draw = ImageDraw.Draw(self.disp_img) # image is drawned
+            
+        
+        # below part gets updated at every new cube_status sent
+        for i, color in enumerate(cube_status):            # iteration over the 54 facelets interpreted colors
+            B,G,R = self.c[color]                          # BGR values of the assigned colors for the corresponding detected color
+            x = self.tlc[i][0]+self.g                      # x coordinate for the origin-square colored facelet
+            y = self.tlc[i][1]+self.g                      # y coordinate for the origin-square colored facelet
+            dx = x + self.d - self.gg                      # x coordinate for the end-square colored facelet
+            dy = y + self.d - self.gg                      # y coordinate for the end-square colored facelet
+            self.disp_draw.rectangle((x, y, dx, dy), (R,G,B))   # cube sketch grid
+        
+        self.disp.display(self.disp_img)                   # image is drawned
+        self.disp.set_backlight(1)                         # display backlight is set on
+    
+    
+    
+    
     def test_display(self):
         """ Test showing some text into some rectangles."""
         

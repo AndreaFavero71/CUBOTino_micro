@@ -3,16 +3,16 @@
 
 """ 
 #############################################################################################################
-#  Andrea Favero, 06 May 2023
+#  Andrea Favero, 15 March 2024
 #
 #
-#  This code relates to CUBOTino autonomous, a very small and simple Rubik's cube solver robot 3D printed.
-#  CUBOTino autonomous is the 'Top version', of the CUBOTino robot series.
-#  Demo at https://www.youtube.com/watch?v=EbOHhvg2tJE
+#  This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
+#  CUBOTino micro is the smallest version of the CUBOTino versions
+#  Demo at https://youtu.be/EbOHhvg2tJE
 #  Instructions: https://www.instructables.com/member/AndreaFavero/instructables/
 #
 #  This is the core script, that interracts with few other files.
-#  Many functions of this code have been developed on 2021, for my previous robot (https://youtu.be/oYRXe4NyJqs).
+#  Many functions of this code have been developed on 2021, for my first robot (https://youtu.be/oYRXe4NyJqs).
 #
 #  The cube status is detected via a camera system (piCamera) and OpenCV .
 #  Kociemba solver is used foer the cube solution (from: https://github.com/hkociemba/RubiksCube-TwophaseSolver)
@@ -31,7 +31,7 @@
 """
 
 # __version__ variable
-version = '0.5   06 May 2023'
+version = '1.0   15 Mar 2024'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -44,13 +44,17 @@ parser = argparse.ArgumentParser(description='CLI arguments for Cubotino_m.py')
 parser.add_argument("-v", "--version", help='Display script version.', action='version',
                     version=f'%(prog)s ver:{version}')
 
-# --debug argument is added to the parser
+# --fast argument is added to the parser
 parser.add_argument("-f", "--fast", action='store_true',
                     help="From Flip-Up to close_cover in one movement instead of two")
 
 # --debug argument is added to the parser
 parser.add_argument("-d", "--debug", action='store_true',
                     help="Activates printout of settings, variables and info for debug purpose")
+
+# --no_animation argument is added to the parser
+parser.add_argument("--no_animation", action='store_true',
+                    help="Deactivates the animation on display and screen")
 
 # --cv_wow argument is added to the parser
 parser.add_argument("--cv_wow", action='store_true',
@@ -92,15 +96,6 @@ args = parser.parse_args()   # argument parsed assignement
 # ###############################################################################################
 
 
-from get_macs_AF import get_macs_AF                      # import the get_macs_AF function
-macs_AF = get_macs_AF()                                  # mac addresses of AF bots are retrieved
-
-
-
-def get_fname_AF(fname, pos):
-    """generates a filename based on fname and pos value.
-        This is used to match AF specific setting files to the mac address and its position on macs_AF.txt"""
-    return fname[:-4]+'_AF'+str(pos+1)+'.txt'
 
 
 
@@ -110,149 +105,62 @@ def import_parameters(debug=False):
     """ Function to import parameters from a json file, to make easier to list/document/change the variables
         that are expected to vary on each robot."""
        
+    from Cubotino_m_settings_manager import settings as settings  # settings manager Class
+    
     global frameless_cube, camera_width_res, camera_height_res, s_mode
     global kl, x_l, x_r, y_u, y_b, w_f, w_s, square_ratio, rhombus_ratio
     global delta_area_limit, sv_max_moves, sv_max_time, collage_w, marg_coef, cam_led_bright, cam_led_auto
-    global detect_timeout, show_time, warn_time, quit_time, cover_self_close, vnc_delay
+    global detect_timeout, show_time, warn_time, quit_time, cover_self_close, vnc_delay, fcs_delay
     global built_by, built_by_x, built_by_fs
-    global pathlib, json
+
     
-    # convenient choice for Andrea Favero, to upload the settings fitting my robot, via mac address check
-    import os.path, pathlib, json                                 # libraries needed for the json, and parameter import
-    from getmac import get_mac_address                            # library to get the device MAC ddress
-    import time
     
-    fname = 'Cubotino_m_settings.txt'                             # fname for the text file to retrieve settings
-    folder = pathlib.Path().resolve()                             # active folder (should be home/pi/cube)  
-    eth_mac = get_mac_address().lower()                           # mac address is retrieved
-    if eth_mac in macs_AF:                                        # case the script is running on AF (Andrea Favero) robot
-        pos = macs_AF.index(eth_mac)                              # returns the mac addreess position in the tupple
-        fname = get_fname_AF(fname, pos)                          # generates the AF filename
-    else:                                                         # case the script is not running on AF (Andrea Favero) robot
-        fname = os.path.join(folder, fname)                       # folder and file name for the settings, to be tuned
-    
-    if os.path.exists(fname):                                     # case the settings file exists
-        with open(fname, "r") as f:                               # settings file is opened in reading mode
-            settings = json.load(f)                               # json file is parsed to a local dict variable
-            # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
+    try:                                               # tentative
+        sett = settings.get_settings()                 # settings are retrieved from the settings Class
+        frameless_cube = sett['frameless_cube']        # cube frameless (with/without black frame around the facelets)
+        camera_width_res = sett['camera_width_res']    # Picamera resolution on width 
+        camera_height_res = sett['camera_height_res']  # Picamera resolution on heigh
+        s_mode = sett['s_mode']                        # camera setting mode (pixels binning)
+        kl = sett['kl']                                # coff. for PiCamera stabili acceptance
+        x_l = sett['x_l']                              # image crop on left (before warping)
+        x_r = sett['x_r']                              # image crop on right (before warping)
+        y_u = sett['y_u']                              # image crop on top (before warping)
+        y_b = sett['y_b']                              # image crop on bottom (before warping)
+        w_f = sett['warp_fraction']                    # coeff for warping the image
+        w_s = sett['warp_slicing']                     # coeff for cropping the bottom warped image
+
+        square_ratio = sett['square_ratio']            # acceptance threshold for square sides difference
+        rhombus_ratio = sett['rhombus_ratio']          # acceptance threshold for rhombus axes difference
+        delta_area_limit = sett['delta_area_limit']    # acceptance threshold for facelet area dev from median
+        sv_max_moves = sett['sv_max_moves']            # max moves requested to the Kociemba solver
+        sv_max_time = sett['sv_max_time']              # timeout requested to the Kociemba solver
+        collage_w = sett['collage_w']                  # image width for unfolded cube collage
+        marg_coef = sett['marg_coef']                  # cropping margin arounf faces for immage collage
+        cam_led_bright = sett['cam_led_bright']        # PWM level for the 3W led at Top_cover
+        detect_timeout = sett['detect_timeout']        # timeout for cube status detection
+        show_time = sett['show_time']                  # showing time of the unfolded cube image collage
+        warn_time = sett['warn_time']                  # solve button pressing time before get a worning
+        quit_time = sett['quit_time']                  # solve button pressing time before the quit process
+        vnc_delay = sett['vnc_delay']                  # delay for cube moving to next face at scan (for VNC viewer)
+        built_by = sett['built_by']                    # maker's name to add on the Cubotino logo
+        built_by_x = sett['built_by_x']                # x coordinate for maker's name on display
+        built_by_fs = sett['built_by_fs']              # font size for the maker's name on display
+        fcs_delay = sett['fcs_delay']                  # delay in secs to switch to Fix Coordinates System for facelets position
+        cover_self_close = sett['cover_self_close']    # cover_self_close parameter 
         
-        # update key-values parameters, needed in case of additional parameters added at remote repo
-        settings = update_parameters(fname, settings)
+        if debug:                                      # case debug variable is set true
+            fname = settings.get_settings_fname()      # settings filename is retrieved
+            print('\nImporting servos settings from the text file:', fname)  # feedback is printed to the terminal
+            for param, s in sett.items():              # iteration over the settings dict
+                print(param,': ', s)                   # feedback is printed to the terminal
+            print()                                    # prints an empty line
         
-        if debug:                                                 # case debug variable is set true on __main_
-            print('\nimporting settings from the text file:', fname)    # feedback is printed to the termina
-            print('\nimported parameters: ')                      # feedback is printed to the terminal
-            for parameter, setting in settings.items():           # iteration over the settings dict
-                print(parameter,': ', setting)                    # feedback is printed to the terminal
-            print()
-            
-        os.umask(0) # The default umask is 0o22 which turns off write permission of group and others
-        backup_fname = os.path.join(folder,'Cubotino_m_settings_backup.txt')          # folder and file name for the settings backup
-        with open(os.open(backup_fname, os.O_CREAT | os.O_WRONLY, 0o777), 'w') as f:  # settings_backup file is opened in writing mode
-            if debug:                                             # case debug variable is set true on __main_
-                print('copy of settings parameter is saved as backup at: ', backup_fname)    # feedback is printed to the terminal
-            f.write(json.dumps(settings, indent=0))               # content of the setting file is saved in another file, as backup
-            # NOTE: in case of git pull, the settings file will be overwritten, the backup file not
-        
-        if debug:                                                 # case debug variable is set true on __main_
-            print('\nimported parameters are saved to the backup file\n') # feedback is printed to the terminal
-
-
-        try:                                  # tentative
-
-            if settings['frameless_cube'].lower().strip() == 'false':  # case frameless_cube parameter is a string == false
-                frameless_cube = 'false'                               # cube with black frame around the facelets
-            elif settings['frameless_cube'].lower().strip() == 'true': # case frameless_cube parameter is a string == true
-                frameless_cube = 'true'                                # cube without black frame around the facelets
-            elif settings['frameless_cube'].lower().strip() == 'auto': # case frameless_cube parameter is a string == auto
-                frameless_cube = 'auto'                                # cube with/without black frame around the facelets
-            else:                                                      # case the frameless parameter is not 'false', 'true' or 'auto'
-                print('\n\nAttention: Wrong frameless_cube parameter: It should be "true", "false" or "auto".\n')  # feedback is printed to the terminal
-                frameless_cube = 'auto'                                # cube with/without black frame around the facelets
-            
-            camera_width_res = int(settings['camera_width_res'])      # Picamera resolution on width 
-            camera_height_res = int(settings['camera_height_res'])      # Picamera resolution on heigh
-            s_mode = int(settings['s_mode'])                          # camera setting mode (pixels binning)
-            kl = float(settings['kl'])                                # coff. for PiCamera stabili acceptance
-            x_l = int(settings['x_l'])                                # image crop on left (before warping)
-            x_r = int(settings['x_r'])                                # image crop on right (before warping)
-            y_u = int(settings['y_u'])                                # image crop on top (before warping)
-            y_b = int(settings['y_b'])                                # image crop on bottom (before warping)
-            w_f = float(settings['warp_fraction'])                    # coeff for warping the image
-            w_s = float(settings['warp_slicing'])                     # coeff for cropping the bottom warped image
-            if w_s == 0:                                              # case the parameter equals to zero
-                w_s = 0.1                                             # the parameter is set to 0.1
-            square_ratio = float(settings['square_ratio'])            # acceptance threshold for square sides difference
-            rhombus_ratio = float(settings['rhombus_ratio'])          # acceptance threshold for rhombus axes difference
-            delta_area_limit = float(settings['delta_area_limit'])    # acceptance threshold for facelet area dev from median
-            sv_max_moves = int(settings['sv_max_moves'])              # max moves requested to the Kociemba solver
-            sv_max_time = float(settings['sv_max_time'])              # timeout requested to the Kociemba solver
-            collage_w = int(settings['collage_w'])                    # image width for unfolded cube collage
-            marg_coef = float(settings['marg_coef'])                  # cropping margin arounf faces for immage collage
-            cam_led_bright = float(settings['cam_led_bright'])        # PWM level for the 3W led at Top_cover
-            detect_timeout = int(settings['detect_timeout'])          # timeout for cube status detection
-            show_time = int(settings['show_time'])                    # showing time of the unfolded cube image collage
-            warn_time = float(settings['warn_time'])                  # solve button pressing time before get a worning
-            quit_time = float(settings['quit_time'])                  # solve button pressing time before the quit process
-            vnc_delay = float(settings['vnc_delay'])                  # delay for cube moving to next face at scan (for VNC viewer)
-            built_by = settings['built_by']                           # maker's name to add on the Cubotino logo
-            built_by_x = int(settings['built_by_x'])                  # x coordinate for maker's name on display
-            built_by_fs = int(settings['built_by_fs'])                # font size for the maker's name on display
-            
-            if settings['cover_self_close'].lower().strip() == 'false':  # case cover_self_close parameter is a string == false
-                cover_self_close = False                              # cover_self_close parameter is set boolean False
-            elif settings['cover_self_close'].lower().strip() == 'true': # case cover_self_close parameter is a string == true
-                cover_self_close = True                               # cover_self_close parameter is set boolean True
-            else:                               # case the frameless parameter is not 'false', 'true' or 'auto'
-                print('\n\nAttention: Wrong cover_self_close parameter: It should be "true" or "false."\n')  # feedback is printed to the terminal
-                cover_self_close = False                              # cover_self_close parameter is set boolean False
-            
-            return True, settings
-            
-        
-        except:   # exception will be raised if json keys differs, or parameters cannot be converted to int/float
-            print('error on converting the imported parameters to int, float or string')   # feedback is printed to the terminal                                  
-            return False, ''                                    # return robot_init_status variable, that is False
+        return True, sett                              # return True for loaded settings and the sett dictionary
     
-    else:                                                       # case the settings file does not exists, or name differs
-        print('could not find Cubotino_m_servo_settings.txt')   # feedback is printed to the terminal                                  
-        return False, ''                                        # return robot_init_status variable, that is False
+    except:   # exception will be raised if json keys differs, or parameters cannot be converted to int/float
+        print('Error at imported_parameters function in Cubotino_m.py')   # feedback is printed to the terminal                                  
+        return False, ''                               # return robot_init_status variable, that is False
 
-
-
-
-
-
-
-def update_parameters(fname, settings):
-    """Function to check if the existing fname (Cubotino_m_settings.txt) has all the parameters that were instroduced after firts release.
-        This will allow every Makers to 'git pull' the updates while pre-serving personal settings.
-        This works by adding  *_settings.txt to gitignore.
-        Cubotino_m.py will update Cubotino_m_settings.txt with eventually missed parameters and related default values.
-        """
-    
-    settings_keys = settings.keys()
-    any_change = False
-    
-    if 'built_by' not in settings_keys:
-        settings['built_by']=''
-        any_change = True
-        
-    if 'built_by_x' not in settings_keys:
-        settings['built_by_x']='25'
-        any_change = True
-        
-    if 'built_by_fs' not in settings_keys:
-        settings['built_by_fs']='22'
-        any_change = True
-    
-    if any_change:
-        print('\nOne time action: Adding new parameters to the Cubotino_m_settings.txt')
-        print('Action necessary for compatibility with the latest downloaded Cubotino_m.py \n')
-        with open(fname, 'w') as f:
-            f.write(json.dumps(settings, indent=0))   # content of the updated setting is saved 
-    
-    return settings
 
 
 
@@ -265,9 +173,11 @@ def import_libraries():
         These librries are imported after those needed for the display management.
         Kociemba solver is tentatively imported considering three installation/copy methods."""
     
-    global camera_set_gains, dist, PiRGBArray, PiCamera, servo, rm, GPIO, median, dt, sv, cubie, np, math, time, cv2, os
+    global camera_set_gains, dist, PiRGBArray, PiCamera, servo, rm, GPIO, median, dt, sv, cubie
+    global np, math, time, cv2, os, pathlib
     
     # import custom libraries
+    from Cubotino_m_settings_manager import settings as settings   # custom library managing the settings from<>to the settings files
     import Cubotino_m_set_picamera_gain as camera_set_gains  # script that allows to fix some parameters at picamera
     import Cubotino_m_servos as servo                     # custom library controlling Cubotino servos and led module
     import Cubotino_m_moves as rm                         # custom library, traslates the cuber solution string in robot movements string
@@ -276,6 +186,7 @@ def import_libraries():
     from picamera.array import PiRGBArray                 # Raspberry pi specific package for the camera, using numpy array
     from picamera import PiCamera                         # Raspberry pi specific package for the camera
     from statistics import median                         # median is used as sanity check while evaluating facelets contours
+    import os.path, pathlib                               # import libraries for file and folder management
     import RPi.GPIO as GPIO                               # import RPi GPIO library
     import datetime as dt                                 # mainly used as timestamp, like on data logging
     import numpy as np                                    # data array management
@@ -1251,6 +1162,56 @@ def estimate_facelets(facelets, frame, w, h):
 
 
 
+def get_facelets_fcs(facelets, frame):
+    """This function points to fix coordinates at the cube face image, to retrieve the color.
+        Dummy contours are made, to visualize them on screen, or saved picture_collage, when debug is true."""
+    
+    if debug:
+        print("\nCalled the fix_coordinate_approach")
+        
+    c = f_coordinates                          # f_coordinates assigned to a local very short variable name
+    
+    # x and y distance between the facelets coordinates
+    x_dist = (c[2]-c[0] + c[4]-c[2] + c[8]-c[6] + c[10]-c[8] + c[14]-c[12] + c[16]-c[14])/6
+    y_dist = (c[7]-c[1] + c[9]-c[3] + c[11]-c[5] + c[13]-c[7] + c[15]-c[9] + c[17]-c[11])/6
+    
+    s_side_x = int(round(0.6*x_dist/2,0))      # half side dimension, along x, for the estimated contour square
+    s_side_y = int(round(0.6*y_dist/2,0))      # half side dimension, along y, for the estimated contour square                    
+    
+    area = s_side_x*s_side_y*4                 # estimated area
+    for i in range(0,18,2):                    # iteration over the 9 facelets
+        tl = [c[i] - s_side_x, c[i+1] - s_side_y]  # top left contour coordinate, calculated from the fix coordinate center point
+        tr = [c[i] + s_side_x, c[i+1] - s_side_y]  # top right contour coordinate, calculated from the fix coordinate center point
+        br = [c[i] + s_side_x, c[i+1] + s_side_y]  # bottom right contour coordinate, calculated from the fix coordinate center point
+        bl = [c[i] - s_side_x, c[i+1] + s_side_y]  # bottom left contour coordinate, calculated from the fix coordinate center point
+        pts=np.array([tl, tr, br, bl], dtype="int32")  # estimated contour coordinates      
+        
+        gap=3                                  # pixels gap
+        tl[0]=max(tl[0]-gap,0)                 # top left x coordinate, shifted toward the contour outer side
+        tl[1]=max(tl[1]-gap,0)                 # top left y coordinate, shifted toward the contour outer side
+        tr[0]=min(tr[0]+gap,w)                 # top right x coordinate, shifted toward the contour outer side
+        tr[1]=max(tr[1]-gap,0)                 # top right y coordinate, shifted toward the contour outer side
+        br[0]=min(br[0]+gap,w)                 # bottom right x coordinate, shifted toward the contour outer side
+        br[1]=min(br[1]+gap,h)                 # bottom right y coordinate, shifted toward the contour outer side
+        bl[0]=max(bl[0]-gap,0)                 # bottom left x coordinate, shifted toward the contour outer side
+        bl[1]=min(bl[1]+gap,h)                 # bottom left y coordinate, shifted toward the contour outer side
+        outer_pts=np.array([tl, tr, br, bl], dtype="int32")     # estimated contour coordinates, sligtly shifted toward the contour outer side
+        
+        contour_tmp = [pts]                    # list is made with the ordered outer contour
+        frame = cv2.drawContours(frame, contour_tmp, -1, (0, 0, 0), 1)        # a black polyline is drawn on the contour (1 px thickness)
+        contour_tmp = [outer_pts]              # list is made with the ordered outer contour
+        frame = cv2.drawContours(frame, contour_tmp, -1, (255, 255, 255), 1)  # a white polyline is drawn on the outer contour (1 px thickness)
+
+        tmp = {'area': area, 'cx': c[i], 'cy': c[i+1], 'contour':pts, 'cont_ordered':pts} # dict with relevant contour info
+        facelets.append(tmp)                   # estimated facelets relevant info are appended to the detected facelets list
+    
+    return facelets, frame     # facelets info, based on fix coordinates, are returned
+
+
+
+
+
+
 
 def area_deviation(data, min_area, max_area):
     """ Checks whether the areas of 9 facelets are within a pre-defined deviation from the median one
@@ -1389,6 +1350,156 @@ def order_9points(data, new_center):
                 data.pop(i)                       # used data-element is removed to speed up next iterations
                 break                             # inner for loop can be break once the if found and data appended
     return new_center
+
+
+
+
+
+
+
+def save_coordinates(coordinates):
+    """Saves the coordinates of the 9 facelets to a text file.
+        This action is done when a cubes_status is correctly determined.
+        The 9 coordinates are averaged from the 6 faces."""
+    
+    coordinates = np.array(coordinates)                     # the coordinates list is converted to numpy array 
+    avg = coordinates.mean(axis=0)                          # coordinates are averaged by 'columns'
+    avg = np.round(avg, decimals=0).astype(int)             # coordinates are first rounded to 0 decimal then converted to integers
+    avg = str(list(avg))                                    # coordinates are converted from array to list to string
+    avg = avg.replace('[','').replace(']','').replace(' ','')+'\n'  # coordinates string without parentheses and empty spaces
+    fname = 'Cubotino_m_coordinates.txt'                    # fname for the text file to retrieve the coordinates
+    folder = pathlib.Path().resolve()                       # active folder (should be home/pi/cubotino/src)
+    fname = os.path.join(folder, fname)                     # folder and file name for the coordinates, to be saved
+    with open (fname, 'a') as f:                            # text file is opened to write on it in 'appending' mode
+        f.write(avg)                                        # coordinates are saved to text file
+
+
+
+
+
+
+
+def load_coordinates():
+    """Loads the coordinates of the 9 facelets from a text file."""
+    
+    historical_data = False                                 # flag to track presence or assence of historical data is set False
+    lines=[]                                                # lines variable is set as empty list
+    fname = 'Cubotino_m_coordinates.txt'                    # fname for the text file to retrieve the coordinates
+    folder = pathlib.Path().resolve()                       # active folder (should be home/pi/cubotino/src) 
+    fname = os.path.join(folder, fname)                     # folder and file name for the coordinates, to be loaded
+    
+    if os.path.exists(fname):                               # case the coordinates file exists
+        with open(fname, "r") as f:                         # settings file is opened in reading mode
+            lines = f.read().splitlines()                   # all lines (without LF) are assigned as list to lines variable
+        if len(lines)>=1:                                   # case the file has at least one row of data
+            historical_data = True                          # flag to track presence or assence of historical data is set True
+    else:                                                   # case the coordinates file does not exist
+        print(f"Not found file {fname}")                    # print feedback to the terminal
+        print("This file is generated by the robot at the first successfull cycle") # print feedback to the terminal
+
+    corrupted_data = False                                  # corrupted_data is initially set False
+    if historical_data:                                     # case there is historical data
+        lines = [line.replace(' ', '') for line in lines]   # all spaces are removed
+        valid_chars = set('0123456789,')                    # set of valid charcters (includes comma)
+        for line in lines:                                  # iteration through the lines
+            for c in line:                                  # iteration through the characters in line
+                if c not in valid_chars:                    # case the character is not valid
+                    corrupted_data = True                   # corrupted_data is set True
+                    break                                   # inner for_loop s interrupted
+            if corrupted_data:                              # case corrupted_data is True
+                break                                       # outer loop_is interrupted
+       
+    if historical_data and corrupted_data:                  # case there is historical yet corrupted_data
+        if debug:                                           # case debug is set true
+            print(f"\nNot valid characters in {fname}")     # feedback is printed to the terminal
+        new_lines=[]                                        # empty list to store the cleaned lines
+        with open(fname, "w") as f:                         # settings file is opened in writing mode
+            for line in lines:                              # iteration through the lines
+                if not line.isspace():                      # case the line is not empty
+                    keep_line=True                          # keep_line variable is initially set True
+                    for c in line.strip().strip('\n'):      # iteration through the characters in line
+                        if c not in valid_chars:            # case the character is not valid
+                            keep_line=False                 # keep_line variable is set False
+                            break                           # inner for_loop is interrupted
+                    if keep_line:                           # case keep_line variable is (still) True
+                        f.write(line)                       # that line is written to text file
+                        new_lines.append(line)              # line is appended to lines
+        
+        if len(new_lines)>=1:                               # case the file has at least one row of data
+            lines = new_lines                               # new_lines is assigned to lines
+            if debug:                                       # case debug is set true
+                print(f"The file got repaired")             # feedback is printed to the terminal
+        else:                                               # case the remaining file does not have any row of data
+            lines=[]                                        # lines variable is set as an empty list
+            historical_data = False                         # historical data variable is set False
+            
+    if historical_data:                                     # case there is historical data
+        if len(lines)>=1:                                   # case the file has at least one row of data
+            for line in lines:                              # iteration over the lines
+                if len(line)>35:                            # case the line has at least 35 characters
+                    historical_data = True                  # flag to track presence or assence of historical data is set True
+                else:                                       # case the line has at less than 26 characters
+                    historical_data = False                 # flag to track presence or assence of historical data is set True
+                    print("The file with facelets coordinates seems empty") # feedback is printed to the terminal
+                    print("File will be filled and/or repaired the next time Cubotino_m.py is launched") # feedback is printed to the terminal
+                    break                                   # for loop is interrupted
+    
+    if historical_data:                                     # case there is historical data
+        # convert from string to integers and feed a list with coordinates values as tuple
+        all_coordinates = []                                # empty list to store all the coordinates (prevoius solves cubes)
+        for line in lines:                                  # iterating on each set of coordinates (each cube)
+            coordinates=[]                                  # empty list to store the coordinated parsed from text to integers
+            for i in range(17):                             # iterating over the 9 facelets of each cube set of coordinates
+                val = int(line[: line.find(',')])           # coordinate is retrieved and converted to integer
+                line = line[line.find(',')+1:]              # line is sliced for the remaining coordinates
+                coordinates.append(val)                     # facelet coordinate is appended to the coordinates list
+            coordinates.append(int(line))                   # the last facelet is appended to the coordinates list
+            all_coordinates.append(coordinates)             # all the facelet coordinates are appended to all_coordinates list variable
+        
+        # limits the dataset to latest 5 cube readings saved (latest scans are more relevant, in case of settings changed at robot)
+        n = len(all_coordinates)                            # quantity of coordinates sets (cubes) stored
+        if n > 5:                                           # case there are more than 5 sets of coordinates (more than 5 cubes' history)
+            all_coordinates = all_coordinates[-5:]          # only the last 5 are considered
+        
+        if n > 10:                                          # case there are more than 10 sets of coordinates (more than 5 cubes' history)
+            remove_old_data(fname)                          # call a function that removes old data from the text file
+        
+        # average the coordinates from the dataset
+        all_coordinates = np.array(all_coordinates)         # the list of lists all_coordinates is changed to a 2d numpy array
+        avg = all_coordinates.mean(axis=0)                  # coordinates are averaged by 'columns'
+        avg = np.round(avg, decimals=0).astype(int)         # coordinates are first rounded to 0 decimal then converted to integers
+        avg = avg.tolist()                                  # coordinates are assigned to a list
+        if debug:                                           # case debug is set true
+            print("Loaded facelets coordinates:", avg)      # feedback is printed to the terminal
+        return avg                                          # the average coordinates are returned
+    
+    else:                                                   # case there isn't historical data
+        if debug:                                           # case debug is set true
+            print("Not loaded facelets coordinates")        # feedback is printed to the terminal
+        return []                                           # an empty list is returned 
+
+
+
+
+
+
+
+def remove_old_data(fname):
+    """"Removes excess data from the coordinates file (it keeps the last 5 rows)."""
+    
+    with open(fname, "r") as f:                             # settings file is opened in reading mode
+        lines = f.readlines()                               # all lines are assigned as list to lines variable
+        lines = lines[-5:]                                  # the last 5 lines are assigned to a local variable
+    
+    with open (fname, 'w') as f:                            # text file is opened to write on it (to empty it)
+        f.write('')                                         # an empty character is saved
+    
+    with open (fname, 'a') as f:                            # text file is opened to write on it, in appending mode
+        for line in lines:                                  # iteration over the lines variable
+            f.write(line)                                   # line is written to file
+    
+    if debug:                                               # case debug is set true
+        print(f"\nRemoved excessive data from {fname}")     # feedback is printed to the terminal
 
 
 
@@ -2661,6 +2772,17 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, cube_status, cube_color_s
         # movements to the robot are finally applied
         solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
         
+        # preparing the data for the animation 
+        if animation_activated and solution_Text != 'Error' and not robot_stop:  # case the solver has not returned an error and no stop requests
+            cube_bright_colors = {'white':(255,255,255), 'red':(0,0,204), 'green':(0,132,0),
+                                  'yellow':(0,245,245), 'orange':(0,128,255), 'blue':(204,0,0)}   # bright colors assigned to the six faces colors
+            URFDLB = 'URFDLB'                                             # string with the faces order when plotting
+            colors_a={}                                                   # empty dict to store the colors to plot
+            for i, col in enumerate(cube_color_sequence):                 # iteration ove the detected cube color sequence
+                colors_a[URFDLB[i]] = cube_bright_colors[col]             # colors are assigned to the dictionary
+            animation(screen, colors_a, cube_status_string, robot_moves)  # call the animation function
+
+        
         # some relevant info are logged into a text file
         log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner, tot_robot_time, \
                  start_time, camera_ready_time, cube_detect_time, cube_solution_time, robot_solving_time)
@@ -2727,6 +2849,66 @@ def robot_time_to_solution(start_time, start_robot_time, total_robot_moves):
 
 
 
+def check_headers(folder, fname):
+    """Checks the existing headers of the log file.
+       In case new headers are added, after the first script release, the new headers are added to the log file.
+    """
+    
+    with open(fname, 'r') as f:                     # file is opened, to adjust the headers in case
+        line = f.readline().strip('\n').strip('\t')  # file line without spaces nor tab characteres at line start/end
+        headers = line.split('\t')                  # file headers are listed
+        
+        # last header in previous script release
+        # 'CubeSolution'                            # latest_header used until 13/03/2024
+        
+        # additional headers since the first script release in a tuple (1st element is the last original header)
+        added_headers = ('CubeSolution', 'FCS')
+        latest_header = added_headers[-1]           # header meant to be the latest
+        last_header = headers[-1].strip().strip('\t') # header found as last        
+        
+        if last_header != latest_header:            # case last_header in existing log file differs from latest_header
+            print(f"\nOne time action: Adding column header(s) to Cubotino_solver_log.txt as per last script release\n")
+            new_headers = ''                        # empty string is assigned to the new_headers variable
+            for header in headers:                  # iteration over the current listed headers
+                new_headers += header + '\t'        # new_headers string with tab separated headers
+            
+            # index of the last header used (previous script) in the new headers tupple
+            if last_header in added_headers:        # case the latest header in the original .txt file is found in the added_headers tuple
+                last_used_header_idx  = added_headers.index(last_header)   # index of the element in tuple is assigned
+                
+                iterations = len(added_headers)-last_used_header_idx-1
+                for i in range(iterations):             # iteration for the missed headers 
+                    idx = last_used_header_idx + 1 + i  # pointer for the element in added_header stuple
+                    new_headers += added_headers[idx]   # additional header, at idx position in added_headers tupple, is added
+                    print("Added header:", added_headers[idx]) # feedback is printed to the terminal
+                    if idx < iterations:                # case the iteration has not reached the last loop
+                        new_headers += '\t'             # tab separator is added to headers
+                    else:                               # case the iteration has reached the last loop
+                        new_headers += '\n'             # end of line character is added to headers
+                print()
+
+                # writing the updated headers in the 'existing' file, requires a second temporary file
+                with open(fname, 'r') as orig:          # Cubotino_solver_log.txt file is temporary opened as orig
+                    temp_fname = folder + '/temp.txt'   # name for a temporary file
+                    with open(temp_fname, "w") as temp: # temporary file is opened in write mode
+                        for i, data_line in enumerate(orig):  # iteration over the lines of data in orig file Cubotino_solver_log.txt
+                            if i == 0:                  # case the iteration is on the first row
+                                temp.write(new_headers) # the new_headers is written to the temporary file
+                            else:                       # case the iteration is not on the first row
+                                temp.write(data_line)   # data_line from orig file is written to temp file
+
+                os.remove(fname)                        # fname file (Cubotino_solver_log.txt) is removed
+                os.rename(temp_fname, fname)            # temp file is renamed as Cubotino_solver_log.txt (now with latest headers)
+            
+            else:   # case the latest header in the original .txt file is NOT found in the added_headers tuple
+                print("Cannot add the additional headers to the Cubotino_solver_log.txt file")  # feedback is printed to terminal
+
+
+
+
+
+
+
 def log_data(timestamp, facelets_data, cube_status_string, solution, color_detection_winner, \
              tot_robot_time, start_time, camera_ready_time, cube_detect_time, cube_solution_time, robot_solving_time):
     
@@ -2759,7 +2941,18 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
         l = 'CubeStatus(BGR or HSV or BGR,HSV)'         # 11th column header
         m = 'CubeStatus'                                # 12th column header
         n = 'CubeSolution'                              # 13th column header
-        s = a+'\t'+b+'\t'+c+'\t'+d+'\t'+e+'\t'+f+'\t'+g+'\t'+h+'\t'+i+'\t'+k+'\t'+l+'\t'+m+'\t'+n+'\n'  # tab separated string of the the headers
+        o = 'FCS'                                       # 14th column header
+        
+        # tab separated string of the the headers
+        log_data = (a,b,c,d,e,f,g,h,i,k,l,m,n,o)        # tuple with the columns headers
+        log_data_len = len(log_data)                    # elements in tuple
+        s=''                                            # empty string is assigned to the variable s
+        for i, header in enumerate(log_data):           # interation trhough the tuple
+            s += header                                 # each header is added to the string variable s
+            if i <= log_data_len-2:                     # case the iteration has not reached the last tuple element
+                s += '\t'                               # tab separator is added to the string variable s
+            else:                                       # case the iteration has reached the last tuple element
+                s += '\n'                               # end of line character is added to the string variable s
         
         os.umask(0) # The default umask is 0o22 which turns off write permission of group and others
         
@@ -2768,36 +2961,7 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
             f.write(s)               # data is appended
     
     else:                                               # case the file does exist
-        with open(fname, 'r') as f:                     # file is opened, to adjust the headers in case
-            headers = f.readline().strip('\n').split('\t')  # file headers are listed
-            last_header = 'CubeSolution'                # last header used until 14/01/2023
-            latest_header = 'Screen'                    # latest_header since 14/01/2023
-            
-            if headers[-1] == latest_header:            # case headers[-1] in existing log file equals latest_header
-                pass                                    # do nothing
-        
-            elif headers[-1] == last_header:            # case headers[-1] in existing log file equals last_header
-                print(f"\nOne time action: {latest_header} column header is added to Cubotino_solver_log.txt \n")
-                new_headers = ''                        # empty string is assigned to the new_headers variable
-                for header in headers:                  # iteration over the current listed headers
-                    new_headers += header + '\t'        # new_headers string with tab separated headers
-                new_headers += latest_header + '\n'     # latest_header is added to the new_headers string
-                
-                with open(fname, 'r') as orig:          # Cubotino_solver_log.txt file is temporary opened as orig
-                    temp_fname = folder + '/temp.txt'   # name for a temporary file
-                    with open(temp_fname, "w") as temp: # temporary file is opened in write mode
-                        for i, data_line in enumerate(orig):  # iteration over the lines of data in orig file Cubotino_solver_log.txt
-                            if i == 0:                  # case the iteration is on the first row
-                                temp.write(new_headers) # the new_headers is written to the temporary file
-                            else:                       # case the iteration is not on the first row
-                                temp.write(data_line)   # data_line from orig file is written to temp file
-
-                os.remove(fname)                        # fname file (Cubotino_solver_log.txt) is removed
-                os.rename(temp_fname, fname)            # temp file is renamed as Cubotino_solver_log.txt (now with latest headers)
-            
-            else:    # case headers[-1] in existing log file differs from last_header and latest_header
-                print("\nThere is a problem with the headers names in Cubotino_solver_log.txt")
-            
+        check_headers(folder, fname)                    # checks if necessary to add new headers to the log file
 
     # info to log
     a=str(timestamp)                                    # date and time
@@ -2813,14 +2977,25 @@ def log_data(timestamp, facelets_data, cube_status_string, solution, color_detec
     l=str(facelets_data)                                # according to which methos delivered the solution (BGR, HSV, both)
     m=str(cube_status_string)                           # string with the detected cbe status
     n=str(solution)                                     # solution returned by Kociemba solver
-    
+    o=str(fcs)                                          # fix coordinates system
     
     # tab separated string with info to log
-    s = a+'\t'+b+'\t'+c+'\t'+d+'\t'+e+'\t'+f+'\t'+g+'\t'+h+'\t'+i+'\t'+k+'\t'+l+'\t'+m+'\t'+n+'\n'
-    
+    log_data = (a,b,c,d,e,f,g,h,i,k,l,m,n,o)            # tuple with the columns data
+    log_data_len = len(log_data)                        # elements in tuple
+    s=''                                                # empty string is assigned to the variable s
+    for i, data in enumerate(log_data):                 # interation trhough the tuple
+        s += data                                       # each data is added to the string variable s
+        if i <= log_data_len-2:                         # case the iteration has not reached the last tuple element
+            s += '\t'                                   # tab separator is added to the string variable s
+        else:                                           # case the iteration has reached the last tuple element
+            s += '\n'                                   # end of line character is added to the string variable s
+        
     # 'a'means: file will be generated if it does not exist, and data will be appended at the end
-    with open(fname,'a') as f:   # text file is temporary opened
-        f.write(s)               # data is appended
+    with open(fname,'a') as f:                          # text file is temporary opened
+        f.write(s)                                      # data is appended
+    
+    if debug:                                           # case debug variable is set True
+            print('\nData is saved in cube_solver_log_Rpi.txt') # feedback is printed to the terminal
 
 
 
@@ -3563,39 +3738,158 @@ def tune_image_setup(display, gui_debug):
 
 
 
-# def tune_image(x_l, x_r, y_u, y_b, w_f, w_s):
-#     """funtion showing a PiCamera image after cropping and warping, for tuning purpose."""
-#        
-#   
-#     frame, w, h = read_camera()                     # video stream and frame dimensions
-#     
-#     # frame is cropped in order to limit the image area to analyze
-#     frame2, w2, h2 = frame_cropping(frame, width, height, x_l, x_r, y_u, y_b)
-# 
-#     # frame is warped to have a top like view toward the top cube face
-#     frame2, w2, h2 = warp_image(frame2, w2, h2, w_f, w_s)
-#     
-#     cv2.namedWindow('Camera image')                 # create the cube window
-#     cv2.moveWindow('Camera image', 0,0)             # move the window to (0,0)
-#     cv2.imshow('Camera image', frame)               # shows the frame
-#     cv2.namedWindow('Cropped image')                # create the cube window
-#     cv2.moveWindow('Cropped image', 0,height+60)    # move the window to (0,0)
-#     cv2.imshow('Cropped image', frame2)             # shows the frame 
-#     
-#     key = cv2.waitKey(10000)                        # refresh time is set to 1 second
-#  
-#     
-#     try:                                            # tentative
-#         close_camera()                              # close the camera object
-#     except:                                         # case of exception
-#         pass                                        # do nothing
-#     
-#     try:                                            # tentative
-#         cv2.destroyAllWindows()                     # all open windows are closed
-#     except:                                         # case of exception
-#         pass                                        # do nothing
-#     
-# #     quit_func(quit_script=True)                     # quitting funtion is used to close all the threads and the script
+def cube_facelets_permutation(cube_status, move_type, direction):
+    """Function that updates the cube status, according to the move type the robot does
+       The 'ref' tuples provide the facelet current reference position to be used on the updated position.
+       As example, in case of flip, the resulting facelet 0 is the one currently in position 53 (ref[0])."""
+    
+    if move_type == 'F':         # case the robot move is a cube flip (complete cube rotation around L-R horizontal axis) 
+        ref=(53,52,51,50,49,48,47,46,45,11,14,17,10,13,16,9,12,15,0,1,2,3,4,5,6,7,8,\
+             18,19,20,21,22,23,24,25,26,42,39,36,43,40,37,44,41,38,35,34,33,32,31,30,29,28,27)
+    
+    elif move_type == 'S':       # case the robot move is a spin (complete cube rotation around vertical axis)
+        if direction == '1':     # case spin is CW
+            ref=(2,5,8,1,4,7,0,3,6,18,19,20,21,22,23,24,25,26,36,37,38,39,40,41,42,43,44,\
+                 33,30,27,34,31,28,35,32,29,45,46,47,48,49,50,51,52,53,9,10,11,12,13,14,15,16,17)
+        elif direction == '3':      # case spin is CCW
+            ref=(6,3,0,7,4,1,8,5,2,45,46,47,48,49,50,51,52,53,9,10,11,12,13,14,15,16,17,\
+                 29,32,35,28,31,34,27,30,33,18,19,20,21,22,23,24,25,26,36,37,38,39,40,41,42,43,44)
+    
+    elif move_type == 'R':       # case the robot move is a rotation (lowest layer rotation versus mid and top ones) 
+        if direction == '1':     # case 1st layer rotation is CW
+            ref=(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,24,25,26,18,19,20,21,22,23,42,43,44,\
+                 33,30,27,34,31,28,35,32,29,36,37,38,39,40,41,51,52,53,45,46,47,48,49,50,15,16,17)
+        elif direction == '3':   # case 1st layer rotation is CCW
+            ref=(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,51,52,53,18,19,20,21,22,23,15,16,17,\
+                 29,32,35,28,31,34,27,30,33,36,37,38,39,40,41,24,25,26,45,46,47,48,49,50,42,43,44)
+    
+    new_status = ""              # empty string to generate the cube status, updated according to move_type and direction
+    for i in range(54):          # iteration over the 54 facelets
+        new_status+=str(cube_status[ref[i]])  # updated cube status takes the facelet from previous status at ref location
+    
+    return new_status                      # updated cube status is returneddef cube_facelets_permutation(cube_status, move_type, direction):
+
+
+
+
+
+
+
+def plot_animation(wait, colors_a, cube_status, startup=False, kill=False):
+    """ Based on the detected cube status, a sketch of the cube is plot with bright colors on the pictures collage."""
+
+    if startup:
+        global plot_colors_a, sketch_a, frame_a, start_points_a, inner_points_a, x_start_a, y_start_a, d_a
+        
+        plot_colors_a = colors_a
+        
+        x_start_a = 20                              # x coordinate origin for the sketch
+        y_start_a = 20                              # y coordinate origin for the sketch
+        d_a = 60                                    # edge lenght for each facelet reppresentation
+        
+        sketch_a = np.zeros([9*d_a + 2*y_start_a, 12*d_a + 2*x_start_a, 3],dtype=np.uint8)  # empty array
+        sketch_a.fill(230)                          # array is filled with light gray
+        
+        _, facelets_start_a = cube_sketch_coordinates(x_start_a, y_start_a, d_a)  # dict with the top-left coordinates for each of the 54 facelets
+        
+        inner_points_a = []                         # empty list to store the inner points (coordinates) to be later colored
+        for i in range(54):                         # iteration over the 54 facelets
+            inner_points_a.append(inner_square_points(facelets_start_a,i,d_a)) # array with the 4 square inner vertex coordinates
+        inner_points_a = tuple(inner_points_a)      # list is converted to tuple
+
+        for i in range(54):                         # iteration over the 54 facelets interpreted colors
+            cv2.rectangle(sketch_a,
+            tuple(facelets_start_a[i]),
+                          (facelets_start_a[i][0]+d_a, facelets_start_a[i][1]+d_a),
+                          (0,0,0), 1)               # square black frame are plot to define the cube sketch
+            
+        cv2.namedWindow('animation')                # create the cube window
+        cv2.moveWindow('animation', 0,0)            # move the window to (0,0)
+        for i in range(5):                          # iteration for 5 times (to refresh the new window on screen)
+            cv2.imshow("animation", sketch_a)       # sketch is plot to screen
+            cv2.waitKey(10)                         # refresh time is limited
+
+    for i, color in enumerate(cube_status):         # iteration over the 54 facelets interpreted colors
+        B,G,R = plot_colors_a[color]                # BGR values of the assigned colors for the corresponding detected color
+        cv2.fillPoly(sketch_a, pts = [inner_points_a[i]], color=(B,G,R))  # inner square is colored with bright color    
+    
+    cv2.imshow("animation", sketch_a)               # sketch_a is plot to screen
+    cv2.waitKey(wait)                               # refresh time
+    
+    if kill:                                        # case kill variable is set True
+        cv2.destroyAllWindows()                     # all the windows are closed
+
+
+
+
+
+
+
+def animation(screen, colors_a, cube_status_string, robot_moves):
+    """Plots to screen the facelets animation on a cube sketch.
+        Detected colors are used to identify the different facelets."""
+
+    cube_status_a = cube_status_string              # cube_status_string is assigned to a local and shorter variable
+    
+    # changing the URF oriented cube status to the cube orientation after the scanning 
+    cube_status_a = cube_facelets_permutation(cube_status_a, 'S', '3')  # facelets permutation assigned to updated cube_status_a
+    cube_status_a = cube_facelets_permutation(cube_status_a, 'F', '1')  # facelets permutation assigned to updated cube_status_a
+    
+    idx = 1                                         # idx variale used for the dict key
+    csa = {}                                        # dict to store the cube status from the start until solution
+    csa[0] = cube_status_a                          # first csa value is the cube status after scanning
+    for i in range(0, len(robot_moves),2):          # iteration over the "in-between" robot movements
+        move_type = robot_moves[i:i+1]              # robot move type is retrieved from robot_moves string
+        direction = robot_moves[i+1:i+2]            # robot move direction/repeats is retrieved from robot_moves string
+        if move_type == 'F':                        # case the robot move is F (flip)
+            for k in range(int(direction)):         # iteration over the quantity of flips
+                # facelets permutation assigned to pdated cube_status_a
+                cube_status_a = cube_facelets_permutation(cube_status_a, move_type, direction)
+                csa[idx] = cube_status_a            # csa gets cube_status_a as new value for the idx index
+                idx+=1                              # idx index is incremented
+        else:                                       # case the robot move is not F (not flip means spin or rotate)
+            # facelets permutation assigned to pdated cube_status_a
+            cube_status_a = cube_facelets_permutation(cube_status_a, move_type, direction)
+            csa[idx] = cube_status_a                # csa gets cube_status_a as new value for the idx index
+            idx+=1                                  # idx index is incremented
+        
+    frames = len(csa)                               # len(csa) defines the frames quantity
+    
+    if not screen:                                  # case screen variable is set False (no screen connected)
+        t1 = 2.0                                    # t1 in s (plot time for initial and final cube status on the sketch)
+        t2 = 0.5                                    # t2 in s (plot time for cube status while moving the cube)
+        for i in range(frames):                     # iteration over the frames quantity
+            if robot_stop:                          # case there is a request to stop the robot
+                break                               # for loop is interrupted
+            if i == 0 and not robot_stop:           # case of the first frame
+                disp.plot_status(csa[i], colors_a, startup=True)  # csa is plot to display, after setting the display up
+                for i in range(10):                 # iteration for 10 times
+                    time.sleep(t1/10)               # sleep time at the first frame
+                    if robot_stop:                  # case there is a request to stop the robot
+                        break                       # for loop is interrupted
+            elif i > 0 and not robot_stop:          # case from the 2nd to the last frames
+                disp.plot_status(csa[i], colors_a)  # csa is plot to display
+                time.sleep(t2/5)                    # (smaller) sleep time to let visible the cube status on display          
+        for i in range(10):                         # iteration for 10 times
+            time.sleep(t1/10)                       # additional sleep time at the end (last frame)
+            if robot_stop:                          # case there is a request to stop the robot
+                break                               # for loop is interrupted
+    
+    if screen:                                      # case screen variable is set True
+        t1 = 3000                                   # t1 in ms (plot time for initial and final cube status on the sketch)
+        t2 = 500                                    # t2 in ms(plot time for cube status while moving the cube)
+        for i in range(frames):                     # iteration over the frames quantity
+            if i == 0 and not robot_stop:           # case of the first frame
+                show_ms = t1                        # sketch showing time as per t1
+                plot_animation(show_ms, colors_a, csa[i], startup=True) # initial cube status is plot to the screen
+            elif i < frames-1 and not robot_stop:   # case from the 2nd to the last but frames
+                show_ms = t2                        # sketch showing time as per t2
+                plot_animation(show_ms, colors_a, csa[i])  # cube status is plot to the screen
+            if i == frames-1 and not robot_stop:    # case for the last frames (the only one in the case of only 1 frame: cube already solved)
+                show_ms = t1                        # sketch showing time as per t1
+                plot_animation(show_ms, colors_a, csa[i], kill=True)  # the final cube status is plot with kill instruction
+        if robot_stop:                              # case there are requests to stop the robot 
+            cv2.destroyAllWindows()                 # all the windows are closed
 
 
 
@@ -3608,10 +3902,11 @@ def start_up(first_cycle=False, set_cropping=False):
     
     # global variables
     global camera, width, height, w, h, rawCapture, camera_set_gains       # camera and frame related variables
-    global show_time, cam_led_bright                      # camera and frame related variables
+    global show_time, cam_led_bright                                       # camera and frame related variables
     global sides, side, faces, prev_side, BGR_mean, H_mean, URFDLB_facelets_BGR_mean      # cube status detection related variables
     global timeout, detect_timeout, robot_stop                             # robot related variables
     global font, fontScale, fontColor, lineType                            # cv2 text related variables
+    global f_coordinates, fcs_delay
 
 
 
@@ -3635,8 +3930,16 @@ def start_up(first_cycle=False, set_cropping=False):
 #         detect_timeout = 40             #(AF 40)            # timeout for the cube status detection (in secs)
 #         show_time = 7                      #(AF 7)             # showing time of the unfolded cube images (cube initial status)
         
+        if screen:                                             # case there is a screen connected
+            detect_timeout = int(2 * detect_timeout)           # cube status detection timeout is increased
+            fcs_delay = 2*fcs_delay                            # delay to start the FCS (Fix Coordinates System) 
         if cv_wow:                                             # case the cv image analysis plot is set true
-            detect_timeout = 2 * detect_timeout                # cube status detection timeout is doubled
+            detect_timeout = int(3 * detect_timeout)           # cube status detection timeout is increased
+            fcs_delay = 3*fcs_delay                            # delay to start the FCS (Fix Coordinates System) 
+        if  Rpi_ZeroW:                                         # case a raspberry Pi ZeroW board is detected                              
+            detect_timeout = int(3 * detect_timeout)           # cube status detection timeout is increased
+            fcs_delay = 3*fcs_delay                            # delay to start the FCS (Fix Coordinates System)
+            
         sides={0:'Empty',1:'U',2:'B',3:'D',4:'F',5:'R',6:'L'}  # cube side order used by the robot while detecting facelets colors
         font, fontScale, fontColor, lineType = text_font()     # setting text font paramenters
         camera, rawCapture, width, height = webcam()           # camera relevant info are returned after cropping, resizing, etc
@@ -3651,7 +3954,7 @@ def start_up(first_cycle=False, set_cropping=False):
             time.sleep(5)
             quit_func(quit_script=True, error=True)            # qutting function is called, with script closure
 
-
+        f_coordinates = load_coordinates()                     # f_coordinates (FCS) are uploaded
 
 
 
@@ -3670,6 +3973,7 @@ def cubeAF():
     global sides, side, prev_side, faces, BGR_mean, H_mean, URFDLB_facelets_BGR_mean      # cube status detection related variables
     global font, fontScale, fontColor, lineType                                           # cv2 text related variables
     global servo, robot_stop, robot_idle, timeout, detect_timeout                         # robot related variables
+    global fcs
 
 
     robot_idle = False                              # robot is not anymore idling
@@ -3684,6 +3988,7 @@ def cubeAF():
     start_time = time.time()                        # initial time is stored before picamera warmup and setting
     faces.clear()                                   # empties the dict of images (6 sides) recorded during previous solving cycle
     facelets = []                                   # empties the list of contours having cube's square characteristics
+    all_coordinates = []                            # empties the list of contours centers coordinate as reference for next facelet search
     robot_to_cube_side(side, cam_led_bright)        # robot set with camera on read position
     servo.cam_led_On(cam_led_bright)                # led on top_cover is switched on before the PiCamera warmup phase     
     PiCamera_param = robot_camera_warmup(camera, start_time)    # calls the warmup function for PiCamera
@@ -3693,7 +3998,9 @@ def cubeAF():
         timestamp = dt.datetime.now().strftime('%Y%m%d_%H%M%S') # date_time variable is assigned, for file name and log purpose
         camera_ready_time=time.time()               # time stored after picamera warmup and settings for consistent pictures
         side = 1                                    # side is changed to 1, as the cube faces are numbered from 1 to 6
-
+        fcs = 0                                     # fcs = fix coordinates system, is initially set False (0)
+        t_ref = time.time()                         # timer is reset (timer used on each face detection to eventually witch to fix coordinates)
+        
 
     while not robot_stop:                           # substantially the main loop, it can be interrupted by quit_func() 
         if robot_stop:                              # case the robot has been stopped
@@ -3733,6 +4040,10 @@ def cubeAF():
                     cv2.imshow('cube', frame)                          # shows the frame 
                     cv2.waitKey(1)      # refresh time is minimized to 1ms, refresh time mostly depending to all other functions
                 
+                if len(f_coordinates)>0 and time.time() - t_ref > fcs_delay:  # case the (edges based) facelets detection takes more than fcs_delay secs
+                    facelets, frame = get_facelets_fcs(facelets, frame)  # facelets info are based on fix coordinates
+                    fcs += 1                                           # fcs (Fix Coordinates System) is incremented
+            
                 if corners==4:                                         # contours with 4 corners are of interest
                     facelets, frame = get_facelets(facelets, frame, contour, hierarchy) # returns a dict with cube compatible contours
 
@@ -3744,7 +4055,14 @@ def cubeAF():
                         for i in d_to_exclude:                         # remove the contours too faar far to be part of the cube
                             facelets.pop(i)                            # facelet is removed
                 
-                if len(facelets)==9:                                               # case having 9 contours compatible to a cube face
+                if len(facelets)==9:                                   # case having 9 contours compatible to a cube face
+                    if fcs == 0:                                       # case facelets were detected without the fix coordinates system method
+                        coordinates=[]                                 # empty list to store the facelets coordinates of the last scanned face
+                        for i in range(9):                             # iteration over the 9 facelets
+                            coordinates.append(facelets[i]['cx'])      # x coordinate is retrieved and appended to the coordinates list
+                            coordinates.append(facelets[i]['cy'])      # y coordinate is retrieved and appended to the coordinates list
+                        all_coordinates.append(coordinates)            # 9 facelets centers coordinates are appended to all_coordinates (all faces)
+                    
                     robot_facelets_rotation(facelets)                              # order facelets as per viewer POW (due to cube/camera rotations on robot)
                     read_color(frame, facelets, candidates, BGR_mean, H_mean)      # each facelet is read for color
                     URFDLB_facelets_BGR_mean = URFDLB_facelets_order(BGR_mean)     # facelets are ordered as per URFDLB order
@@ -3764,7 +4082,7 @@ def cubeAF():
                             time.sleep(vnc_delay)                # delay for cube face change, to compensate VNC viewer delay
                     
                     robot_to_cube_side(side, cam_led_bright)     # cube is rotated/flipped to the next face
-                    
+                    t_ref = time.time()                          # timer is reset (used on each face detection to eventually use fix coordinates)
 
                     if side < 6:                                 # actions when a face has been completely detected, and there still are other to come
                         side +=1                                 # cube side index is incremented
@@ -3812,7 +4130,9 @@ def cubeAF():
                         elif solution_Text != '0 moves  ':                 # case of interest, the cube isn't already solved
                             print(f'\nCube solution: {solution_Text}')     # nice information to print at terminal, sometime useful to copy 
                         
-
+                        if fcs == 0:   # (fcs = fix coordinates system) case the all facelets were detected without the fix coordinates method
+                            save_coordinates(all_coordinates)              # saves the coordinates of the 9 facelets found during scanning
+                        
                         # function related to cube solving via the robot
                         robot_solve_cube(fixWindPos, screen, frame, faces, cube_status, cube_color_seq, HSV_analysis, 
                                             URFDLB_facelets_BGR_mean, font, fontScale, lineType, show_time, timestamp,
@@ -3872,6 +4192,12 @@ if __name__ == "__main__":
     if args.cv_wow != None: # case 'cv_wow' argument exists
         if args.cv_wow:     # case the Cubotino_m.py has been launched with 'cv_wow' argument
             cv_wow = True   # flag to enable/disable the visualization of the image analysis used to find the facelets is set True
+    
+    animation_activated = True    # flag to enable/disable the cube_status animation on screen is set True
+    if args.no_animation != None: # case 'no_animation' argument exists
+        if args.no_animation:     # case the Cubotino_P.py has been launched with 'no_animation' argument
+            animation_activated = False   # flag to enable/disable the cube_status animation on screen is set False
+    
     if cv_wow:              # case the cv image analysis plot is set true
         screen = True       # screen related functions are activated
     
