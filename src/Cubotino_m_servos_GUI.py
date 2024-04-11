@@ -590,7 +590,7 @@ def warp_f_get(val):
 
 def warp_s_get(val):
     global warp_slicing
-    warp_slicing = int(s_warp_s.get())         # Warping slincing
+    warp_slicing = float(s_warp_s.get())       # Warping slincing
     disp.show_on_display('WARP SLICING', str(warp_slicing), fs1=26, y2=75, fs2=30)  # feedback is printed to the display
     take_image(widgets_freeze=False)           # camera reads one frame
 ######################################################################################################################
