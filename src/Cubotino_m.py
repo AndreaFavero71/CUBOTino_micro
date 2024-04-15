@@ -3,7 +3,7 @@
 
 """ 
 #############################################################################################################
-#  Andrea Favero, 11 April 2024
+#  Andrea Favero, 15 April 2024
 #
 #
 #  This script relates to CUBOTino micro, an extremely small and simple Rubik's cube solver robot 3D printed
@@ -20,7 +20,7 @@
 #  Search for CUBOTino autonomous on www.intructable.com, to find more info about this robot.
 #
 #  Developped on:
-#  - Raspberry pi Zero 2
+#  - Raspberry Pi Zero 2
 #  - Raspberry Pi OS (Legacy) A port of Debian Buster with security updates and desktop environment
 #    (Linux raspberry 5.10.103-v7+ #1529 SMP Tue 8 12:21:37 GMT 2022 armv71 GNU/Linux)
 #  - OpenCV cv2 ver: 4.1.0
@@ -31,7 +31,7 @@
 """
 
 # __version__ variable
-version = '1.1   11 April 2024'
+version = '1.1   15 April 2024'
 
 
 ################  setting argparser for robot remote usage, and other settings  #################
@@ -2771,33 +2771,33 @@ def robot_solve_cube(fixWindPos, screen, frame, faces, cube_status, cube_color_s
         except:
             pass
      
-        if not robot_stop:                      # case there are no request to stop the robot
-            # movements to the robot are finally applied
-            solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
+    if not robot_stop:                          # case there are no request to stop the robot
+        # movements to the robot are finally applied
+        solved, tot_robot_time, robot_solving_time = robot_move_cube(robot_moves, total_robot_moves, solution_Text, start_time)
+        
+        # preparing the data for the animation
+        
+        # case the solver has not returned an error and no stop requests
+        if animation_activated and solution_Text != 'Error' and len(robot_moves) > 0 and not robot_stop:
+            animate = True                                                    # animate variable is set True
+            if len(cube_color_sequence) != 6:                                 # case the cube_color_sequence does not have 6 elements
+                animate = False                                               # animate is set False
             
-            # preparing the data for the animation
-            
-            # case the solver has not returned an error and no stop requests
-            if animation_activated and solution_Text != 'Error' and len(robot_moves) > 0 and not robot_stop:
-                animate = True                                                    # animate variable is set True
-                if len(cube_color_sequence) != 6:                                 # case the cube_color_sequence does not have 6 elements
-                    animate = False                                               # animate is set False
-                
-                cols = ('white','red','green','yellow','orange','blue')           # tuple with the expected colors in cube_color_sequence
-                for col in cols:                                                  # iteration over the colors
-                    if col not in cube_color_sequence:                            # case col is not in cube_color_sequence
-                        animate = False                                           # animate is set False 
-                        break                                                     # foor loop is interrupted
-   
-                if animate:                                                       # case animate is (still) set True
-                    cube_bright_colors = {'white':(255,255,255), 'red':(0,0,204),
-                                          'green':(0,132,0), 'yellow':(0,245,245),
-                                          'orange':(0,128,255), 'blue':(204,0,0)} # bright colors assigned to the six faces colors
-                    URFDLB = 'URFDLB'                                             # string with the faces order when plotting
-                    colors_a = {}                                                 # empty dict to store the colors to plot
-                    for i, col in enumerate(cube_color_sequence):                 # iteration ove the detected cube color sequence
-                        colors_a[URFDLB[i]] = cube_bright_colors[col]             # colors are assigned to the dictionary
-                    animation(screen, colors_a, cube_status_string, robot_moves)  # call the animation function
+            cols = ('white','red','green','yellow','orange','blue')           # tuple with the expected colors in cube_color_sequence
+            for col in cols:                                                  # iteration over the colors
+                if col not in cube_color_sequence:                            # case col is not in cube_color_sequence
+                    animate = False                                           # animate is set False 
+                    break                                                     # foor loop is interrupted
+
+            if animate:                                                       # case animate is (still) set True
+                cube_bright_colors = {'white':(255,255,255), 'red':(0,0,204),
+                                      'green':(0,132,0), 'yellow':(0,245,245),
+                                      'orange':(0,128,255), 'blue':(204,0,0)} # bright colors assigned to the six faces colors
+                URFDLB = 'URFDLB'                                             # string with the faces order when plotting
+                colors_a = {}                                                 # empty dict to store the colors to plot
+                for i, col in enumerate(cube_color_sequence):                 # iteration ove the detected cube color sequence
+                    colors_a[URFDLB[i]] = cube_bright_colors[col]             # colors are assigned to the dictionary
+                animation(screen, colors_a, cube_status_string, robot_moves)  # call the animation function
 
         
         # some relevant info are logged into a text file
